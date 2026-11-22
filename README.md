@@ -1,0 +1,78 @@
+# game-off-2026
+
+An entry for [Game Off 2026](https://itch.io/jam/game-off-2026), GitHub's annual month-long game jam.
+The theme is **SHIFT**.
+
+The game is still being designed, so this README will grow: title, how to play, and a link to the playable build on
+itch.io will go here.
+
+## Status
+
+Project set up on 22 November 2026. Nothing playable yet.
+
+## Built with
+
+- Unity 6000.7.0b10 (Universal Render Pipeline, Input System, Cinemachine)
+- Targets: WebGL (played in the browser on itch.io) and Windows
+
+## What is and isn't in this repository
+
+Game Off asks for the source to be public, and allows purchased or proprietary assets to be left out. This
+repository follows that:
+
+**Included**
+
+- All of the game's own code, scenes, prefabs, settings and other original work: `Assets/_Project`, `Assets/Scenes`,
+  `Assets/Settings`, `Assets/WebGLTemplates`
+- Project configuration: `Packages`, `ProjectSettings`
+- Build and helper scripts: `Tools`
+
+**Not included**
+
+Paid Unity Asset Store packages and anything made from them. Their licences don't allow redistribution, so they are
+kept out with `.gitignore` and were never committed. They are present on my machine and in the playable build.
+
+Editor tools and code libraries (needed to compile if the game's code uses them):
+
+| Package | Author | Folder it imports to |
+|---|---|---|
+| Asset Inventory 4 | Impossible Robert | `Assets/AssetInventory` |
+| Odin Inspector and Serializer | Sirenix | `Assets/Plugins/Sirenix` |
+| DOTween | Demigiant | `Assets/Plugins/Demigiant` |
+| Easy Character Movement 2 | Oscar Gracin | `Assets/ECM2` |
+| Shapes | Freya Holmér | `Assets/Shapes` |
+| Spline Architect | Mike Danielsson | `Assets/SplineArchitect` |
+| Sound Shapes | TelePresent Games | `Assets/TelePresent` |
+| vFolders 2, vFavorites 2 | kubacho lab | `Assets/vFolders`, `Assets/vFavorites` |
+
+Art, audio and other content packs used by the game will be listed under "Third-party assets" below as they are
+added.
+
+## Opening the project
+
+1. Clone the repository and open the folder with Unity 6000.7.0b10 (or newer) through Unity Hub.
+2. Unity downloads the registry packages listed in `Packages/manifest.json` by itself.
+3. Without the packages above, scenes open with missing meshes, materials or scripts wherever the game uses them,
+   and code that calls into a missing library won't compile. If you own a package, import it from the Asset Store
+   into its usual folder and those references resolve, because Unity matches assets by their GUIDs.
+
+The code is here to be read; the playable game is the build on itch.io.
+
+## Third-party assets
+
+None in the game yet.
+
+<!-- One row per pack: name, author, what it's used for, licence, "not in this repository". -->
+
+## AI disclosure
+
+This project is developed with AI assistance: [Claude Code](https://claude.com/claude-code) is used for programming,
+project setup and tooling. Any AI-generated art, audio or text that ends up in the game will be listed here.
+
+## Licence
+
+Copyright © 2026 shaariqch. All rights reserved.
+
+The source is public so that it can be read, as Game Off requires. No permission is given to copy, modify,
+redistribute or reuse the code or assets. Third-party assets remain the property of their authors under their own
+licences.

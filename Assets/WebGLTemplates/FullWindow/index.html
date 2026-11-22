@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>{{{ PRODUCT_NAME }}}</title>
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+      #unity-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: #000; outline: none; }
+      #loading { position: fixed; left: 50%; top: 50%; width: 40%; max-width: 360px; height: 4px; transform: translate(-50%, -50%);
+                 background: rgba(255, 255, 255, 0.12); border-radius: 2px; overflow: hidden; }
+      #loading-fill { width: 0%; height: 100%; background: #ddd; transition: width 0.2s; }
+      #fps { position: fixed; left: 8px; top: 8px; z-index: 9; font: bold 20px monospace; color: #0f0; background: #000a; padding: 2px 6px; display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <div id="loading"><div id="loading-fill"></div></div>
+    <div id="fps"></div>
+    <script src="Build/{{{ LOADER_FILENAME }}}"></script>
+    <script>
+      // Browsers refuse pointer lock now and then (the window isn't focused, or the player pressed Esc a moment ago).
+      // The request's promise then rejects, and Unity's loader treats any unhandled rejection as fatal: it shows a
+      // blocking alert and the game stops. The game asks again on the next click, so these are safe to ignore.
+      function ignorable(message) {
+        return /pointer ?lock|pointerlock|fullscreen/i.test(String(message));
+      }
+
+      if (/[?&]fps\b/.test(location.search)) {
+        var fpsBox = document.getElementById("fps"), frames = 0, since = performance.now();
+        fpsBox.style.display = "block";
+        (function tick() {
+          frames++;
+          var now = performance.now();
+          if (now - since >= 1000) { fpsBox.textContent = (frames * 1000 / (now - since)).toFixed(1) + " fps"; frames = 0; since = now; }
+          requestAnimationFrame(tick);
+        })();
+      }
+
+      // Chrome on Windows sometimes reports a locked mouse jumping about 1,400 px in one event, often several in a row,
+      // which spun the camera round (seen in the previous game's test log on 2026-11-08; real flicks stayed under about 130 px per
+      // event). Those events are stopped here, before the game's own listeners see them.
+      // The known fix (github.com/nir3x/webgl-mouse-input-fix): ask for raw movement on every pointer lock, Unity's own
+      // included, which also skips Windows mouse acceleration. Browsers without it refuse, and get the plain lock.
+      var plainLock = Element.prototype.requestPointerLock, rawMouse = false;
+      document.addEventListener("pointerlockchange", function () { if (!document.pointerLockElement) rawMouse = false; });
+      Element.prototype.requestPointerLock = function (options) {
+        var self = this, raw = Object.assign({}, options, { unadjustedMovement: true });
+        var request;
+        try { request = plainLock.call(self, raw); } catch (e) { return plainLock.call(self, options); }
+        if (!request || !request.then) return request;
+        return request.then(function () {
+          rawMouse = true;
+          if (window.webPageLog) webPageLog("js raw mouse lock granted");
+        }, function (error) {
+          if (window.webPageLog) webPageLog("js raw mouse lock refused: " + error);
+          if (error && error.name === "NotSupportedError") return plainLock.call(self, options);
+          throw error;
+        });
+      };
+
+      // Only without raw input: raw movement doesn't have the fake jumps, and real fast flicks with it reach 600 px
+      // per event (the filter ate them, which made fast turns judder, 2026-11-08).
+      var spikeLimit = 400, spikesDropped = 0;
+      addEventListener("mousemove", function (e) {
+        if (!rawMouse && (Math.abs(e.movementX) > spikeLimit || Math.abs(e.movementY) > spikeLimit)) {
+          e.stopImmediatePropagation();
+          spikesDropped++;
+          if (window.webPageLog) webPageLog("js dropped jump " + e.movementX + "," + e.movementY);
+        }
+      }, true);
+
+      // Played from Tools/webdev_server.py on this computer (or with ?log), the page reports pointer lock, clicks, keys,
+      // focus and each frame's mouse movement as the browser saw it, and the game adds what it made of them
+      // (WebInputLog, dev builds only, through Plugins/WebGL/WebPage.jslib). The server writes it all to a file, since a page can't.
+      if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname) || /[?&]log\b/.test(location.search)) {
+        var logLines = [];
+        window.webPageLog = function (line) { logLines.push(performance.now().toFixed(1) + " " + line); };
+        var flushLog = function () {
+          if (!logLines.length) return;
+          var body = logLines.join("\n"); logLines = [];
+          fetch("/log", { method: "POST", body: body, keepalive: body.length < 60000 }).catch(function () {});
+        };
+        setInterval(flushLog, 500);
+        addEventListener("pagehide", function () { if (logLines.length) navigator.sendBeacon("/log", logLines.join("\n")); });
+
+        webPageLog("page start " + innerWidth + "x" + innerHeight + " dpr " + devicePixelRatio + " " + navigator.userAgent);
+        document.addEventListener("pointerlockchange", function () {
+          webPageLog("js pointerlock " + (document.pointerLockElement ? "ON " + document.pointerLockElement.id : "OFF"));
+        });
+        document.addEventListener("pointerlockerror", function () { webPageLog("js pointerlock ERROR"); });
+        addEventListener("mousedown", function (e) { webPageLog("js mousedown " + e.button + " on " + (e.target.id || e.target.tagName)); }, true);
+        addEventListener("mouseup", function (e) { webPageLog("js mouseup " + e.button); }, true);
+        addEventListener("keydown", function (e) { if (!e.repeat) webPageLog("js keydown " + e.code); }, true);
+        addEventListener("keyup", function (e) { webPageLog("js keyup " + e.code); }, true);
+        addEventListener("focus", function () { webPageLog("js window focus"); });
+        addEventListener("blur", function () { webPageLog("js window blur"); });
+        document.addEventListener("visibilitychange", function () { webPageLog("js visibility " + document.visibilityState); });
+
+        // mouse movement summed per browser frame: event count, total, and the largest single jump
+        var moves = 0, sumX = 0, sumY = 0, maxJump = 0;
+        addEventListener("mousemove", function (e) {
+          moves++; sumX += e.movementX; sumY += e.movementY;
+          maxJump = Math.max(maxJump, Math.abs(e.movementX), Math.abs(e.movementY));
+        }, true);
+        (function moveTick() {
+          if (moves) { webPageLog("js moves " + moves + " sum " + sumX + "," + sumY + " max " + maxJump); moves = sumX = sumY = maxJump = 0; }
+          requestAnimationFrame(moveTick);
+        })();
+
+        // F9 records one frame's draw calls to the log: each draw's target, its shader program (named by its uniforms,
+        // the first time it's seen) and the target's centre pixel whenever a draw changes it, to find what draws a
+        // pixel. Aim the thing at the screen's centre first. It reads one pixel per draw, so the frame takes a moment.
+        (function () {
+          var GL = WebGL2RenderingContext.prototype, tracing = false, armed = false;
+          var ids = new WeakMap(), nextId = 1, drawFb = null, readFb = null, prog = null, described = new WeakSet();
+          var lastPixel = {}, draws = 0;
+          function id(o) { if (!o) return 0; if (!ids.has(o)) ids.set(o, nextId++); return ids.get(o); }
+
+          var bindFb = GL.bindFramebuffer;
+          GL.bindFramebuffer = function (target, fb) {
+            if (target === this.FRAMEBUFFER || target === this.DRAW_FRAMEBUFFER) drawFb = fb;
+            if (target === this.FRAMEBUFFER || target === this.READ_FRAMEBUFFER) readFb = fb;
+            return bindFb.apply(this, arguments);
+          };
+          var useProg = GL.useProgram;
+          GL.useProgram = function (p) { prog = p; return useProg.apply(this, arguments); };
+
+          function describe(gl, p) {
+            if (!p || described.has(p)) return;
+            described.add(p);
+            var names = [], count = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+            for (var i = 0; i < count; i++) {
+              var u = gl.getActiveUniform(p, i);
+              if (u && !/^(unity_|_ScaledScreenParams|_ProjectionParams|_ZBufferParams|_WorldSpaceCameraPos|_Time|glstate)/.test(u.name)) names.push(u.name);
+            }
+            webPageLog("trace program " + id(p) + ": " + names.slice(0, 25).join(" "));
+          }
+
+          function readCentre(gl) {
+            var vp = gl.getParameter(gl.VIEWPORT), x = vp[0] + (vp[2] >> 1), y = vp[1] + (vp[3] >> 1);
+            bindFb.call(gl, gl.READ_FRAMEBUFFER, drawFb);
+            var out = null;
+            var u8 = new Uint8Array(4);
+            gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, u8);
+            if (gl.getError() === gl.NO_ERROR) out = (u8[0] / 255).toFixed(2) + "," + (u8[1] / 255).toFixed(2) + "," + (u8[2] / 255).toFixed(2) + "," + (u8[3] / 255).toFixed(2);
+            else {
+              var f = new Float32Array(4);
+              gl.readPixels(x, y, 1, 1, gl.RGBA, gl.FLOAT, f);
+              out = gl.getError() === gl.NO_ERROR ? f[0].toFixed(2) + "," + f[1].toFixed(2) + "," + f[2].toFixed(2) + "," + f[3].toFixed(2) + " (hdr)" : "unreadable";
+            }
+            bindFb.call(gl, gl.READ_FRAMEBUFFER, readFb);
+            return { size: vp[2] + "x" + vp[3], value: out };
+          }
+
+          function after(gl, what) {
+            draws++;
+            describe(gl, prog);
+            var px = readCentre(gl), key = id(drawFb);
+            if (lastPixel[key] !== px.value) {
+              webPageLog("trace " + draws + " " + what + " target " + key + " (" + px.size + ") program " + id(prog) + " centre " + px.value);
+              lastPixel[key] = px.value;
+            }
+          }
+
+          ["drawArrays", "drawElements", "drawArraysInstanced", "drawElementsInstanced", "drawRangeElements", "clear", "blitFramebuffer"].forEach(function (name) {
+            var original = GL[name];
+            if (!original) return;
+            GL[name] = function () {
+              var result = original.apply(this, arguments);
+              if (tracing) after(this, name);
+              return result;
+            };
+          });
+
+          addEventListener("keydown", function (e) { if (e.code === "F9" && !e.repeat) armed = true; }, true);
+          (function traceTick() {
+            if (tracing) { tracing = false; webPageLog("trace end, " + draws + " calls"); }
+            else if (armed) { armed = false; tracing = true; draws = 0; lastPixel = {}; webPageLog("trace start"); }
+            requestAnimationFrame(traceTick);
+          })();
+        })();
+      }
+
+      var fill = document.getElementById("loading-fill");
+      createUnityInstance(document.getElementById("unity-canvas"), {
+        arguments: [],
+#if PROGRESSIVE_ASSET_LOADING
+        primaryDataUrls: {{{ JSON.stringify(PRIMARY_DATA_FILES) }}},
+        secondaryDataUrls: {{{ JSON.stringify(SECONDARY_DATA_FILES) }}},
+#else
+        dataUrl: "Build/{{{ DATA_FILENAME }}}",
+#endif
+        frameworkUrl: "Build/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_WASM
+        codeUrl: "Build/{{{ CODE_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+        symbolsUrl: "Build/{{{ SYMBOLS_FILENAME }}}",
+#endif
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+        productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+        productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+        // Render at no more than about 1080p, scaled up to fill the window: at a large window's full size the
+        // frame rate fell so low that the mouse felt laggy. ?scale=0.75 (or any ratio) overrides it for testing.
+        devicePixelRatio: (function () {
+          var asked = parseFloat(new URLSearchParams(location.search).get("scale"));
+          if (asked > 0) return asked;
+          var pixels = window.innerWidth * window.innerHeight;
+          return Math.min(1, Math.sqrt((1920 * 1080) / Math.max(1, pixels)));
+        })(),
+        errorHandler: function (message) {
+          if (ignorable(message)) { console.warn("Ignored: " + message); return true; }
+          return false;
+        },
+      }, function (progress) {
+        fill.style.width = (100 * progress) + "%";
+      }).then(function () {
+        document.getElementById("loading").style.display = "none";
+      }).catch(function (message) {
+        alert(message);
+      });
+    </script>
+  </body>
+</html>
