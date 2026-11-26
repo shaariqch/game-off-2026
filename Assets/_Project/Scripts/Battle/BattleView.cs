@@ -13,6 +13,9 @@ public class BattleView : MonoBehaviour
     [SerializeField] List<ArmyEntry> armyB = new List<ArmyEntry>();
     [Tooltip("0 picks a new seed for every battle. Any other number replays the same battle.")]
     [SerializeField] int seed;
+    [Tooltip("The army stands its ground and lets the enemy come to it. Use it for the side that holds the terrain.")]
+    [SerializeField] bool armyAHolds;
+    [SerializeField] bool armyBHolds = true;
 
     [Header("Field")]
     [Tooltip("Centre of each army's spawn area.")]
@@ -23,6 +26,8 @@ public class BattleView : MonoBehaviour
     [Tooltip("Units can't leave this area, centred on this object: x across, y deep.")]
     [SerializeField] Vector2 fieldSize = new Vector2(48f, 28f);
     [SerializeField] BattleSim.Settings simSettings = BattleSim.Settings.Default;
+    [Tooltip("Active Terrain Zones under this object are part of the battlefield. Empty means the whole scene is searched.")]
+    [SerializeField] Transform terrainRoot;
 
     [Header("Playback")]
     [Tooltip("Battle seconds per real second.")]
@@ -136,8 +141,9 @@ public class BattleView : MonoBehaviour
         reported = false;
 
         int battleSeed = seed != 0 ? seed : Random.Range(1, int.MaxValue);
-        sim = new BattleSim(armyA, armyB, Zone(spawnA), Zone(spawnB), FieldBounds(), battleSeed, simSettings);
-        Debug.Log("[Battle] started with seed " + battleSeed + ", " + sim.units.Count + " units");
+        var zones = TerrainZones();
+        sim = new BattleSim(armyA, armyB, Zone(spawnA), Zone(spawnB), FieldBounds(), battleSeed, simSettings, zones, armyAHolds, armyBHolds);
+        Debug.Log("[Battle] started with seed " + battleSeed + ", " + sim.units.Count + " units, " + zones.Count + " terrain zones");
         foreach (var unit in sim.units)
             figures.Add(MakeFigure(unit));
         ShowUnits();
@@ -147,6 +153,22 @@ public class BattleView : MonoBehaviour
     {
         var local = transform.InverseTransformPoint(centre.position);
         return new Rect(local.x - spawnSize.x * 0.5f, local.z - spawnSize.y * 0.5f, spawnSize.x, spawnSize.y);
+    }
+
+    List<BattleSim.Zone> TerrainZones()
+    {
+        var found = terrainRoot != null
+            ? terrainRoot.GetComponentsInChildren<TerrainZone>(false)
+            : FindObjectsByType<TerrainZone>(FindObjectsSortMode.None);
+        var zones = new List<BattleSim.Zone>();
+        foreach (var zone in found)
+        {
+            if (!zone.isActiveAndEnabled || zone.Terrain == null)
+                continue;
+            var local = transform.InverseTransformPoint(zone.transform.position);
+            zones.Add(new BattleSim.Zone { centre = new Vector2(local.x, local.z), radii = zone.Radii, terrain = zone.Terrain });
+        }
+        return zones;
     }
 
     Rect FieldBounds() => new Rect(-fieldSize.x * 0.5f, -fieldSize.y * 0.5f, fieldSize.x, fieldSize.y);
@@ -188,7 +210,8 @@ public class BattleView : MonoBehaviour
             var marker = new GameObject("Side Marker");
             marker.transform.SetParent(root, false);
             marker.transform.localPosition = new Vector3(0f, markerHeight, 0f);
-            float width = unit.type.radius * 2.4f;
+            // sized from the mesh's own bounds, so any flat disc mesh works
+            float width = unit.type.radius * 2.4f / Mathf.Max(0.001f, markerMesh.bounds.size.x);
             marker.transform.localScale = new Vector3(width, 0.01f, width);
             marker.AddComponent<MeshFilter>().sharedMesh = markerMesh;
             var renderer = marker.AddComponent<MeshRenderer>();
@@ -247,7 +270,7 @@ public class BattleView : MonoBehaviour
 
             float targetYaw = Mathf.Atan2(unit.facing.x, unit.facing.y) * Mathf.Rad2Deg;
             figure.yaw = Mathf.MoveTowardsAngle(figure.yaw, targetYaw, turnSpeed * Time.deltaTime);
-            var position = new Vector3(unit.position.x, 0f, unit.position.y);
+            var position = new Vector3(unit.position.x, sim.HeightAt(unit.position), unit.position.y);
             if (unit.lastAttackTime >= 0f && !unit.lastAttackRanged)
             {
                 float since = (sim.Time - unit.lastAttackTime) / lungeTime;
@@ -295,7 +318,8 @@ public class BattleView : MonoBehaviour
         Vector2 flat = Vector2.Lerp(shot.start, shot.end, t);
         float length = (shot.end - shot.start).magnitude;
         // starts at bow height, peaks mid-flight, lands low on the target
-        float height = Mathf.Lerp(arrowStartHeight, arrowStartHeight * 0.6f, t) + 4f * t * (1f - t) * length * arrowArc;
+        float height = Mathf.Lerp(sim.HeightAt(shot.start) + arrowStartHeight, sim.HeightAt(shot.end) + arrowStartHeight * 0.6f, t)
+            + 4f * t * (1f - t) * length * arrowArc;
         return new Vector3(flat.x, height, flat.y);
     }
 

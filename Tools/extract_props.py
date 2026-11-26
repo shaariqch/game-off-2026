@@ -29,6 +29,20 @@ JOBS = {
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Rock_02.prefab",
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Grass_Tuft_01.prefab",
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Grass_Tuft_02.prefab",
+        # terrain dressing: forest, marsh, hill
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Tree_Round_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Tree_Round_02.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Tree_Thin_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Tree_Thin_02.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Bush_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Bush_02.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Bush_Small_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Reeds_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Reeds_02.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Reeds_03.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Lily_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Rock_03.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Rock_04.prefab",
     ],
 }
 # packs already partly imported somewhere else; new files from them go there too

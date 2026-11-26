@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bca36ffc04621384b96cbaf4bb73b82e, type: 3}
+  m_Name: Marsh
+  m_EditorClassIdentifier: Assembly-CSharp::TerrainType
+  speed: 0.6
+  speedFor:
+  - type: {fileID: 11400000, guid: fed6eb1591a08494baa5f0623125db68, type: 2}
+    speed: 0.2
+  - type: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
+    speed: 0.45
+  allowsCharge: 0
+  shooterRange: 1
+  shooterDamage: 1
+  cover: 1
+  hiddenBeyond: 0
+  meleeDamageFromOutside: 1
+  height: 0

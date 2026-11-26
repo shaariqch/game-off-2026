@@ -31,6 +31,7 @@ public sealed class BattleSim
         internal float retargetIn;
         internal float movedSinceAttack;
         internal float pendingDamage;
+        internal bool pendingShot;
 
         public bool Alive => diedTime < 0f;
     }
@@ -47,6 +48,28 @@ public sealed class BattleSim
         internal float damage;
     }
 
+    /// <summary>An oval patch of terrain.</summary>
+    public struct Zone
+    {
+        public Vector2 centre;
+        public Vector2 radii;
+        public TerrainType terrain;
+
+        /// <summary>0 at the centre, 1 on the edge, more outside.</summary>
+        public float Distance(Vector2 point)
+        {
+            float x = (point.x - centre.x) / radii.x, y = (point.y - centre.y) / radii.y;
+            return Mathf.Sqrt(x * x + y * y);
+        }
+
+        /// <summary>Ground height at a point: a dome that reaches the terrain's height in the middle.</summary>
+        public float Height(Vector2 point)
+        {
+            float distance = Distance(point);
+            return distance >= 1f ? 0f : terrain.height * Mathf.Sqrt(1f - distance * distance);
+        }
+    }
+
     [Serializable]
     public struct Settings
     {
@@ -54,8 +77,10 @@ public sealed class BattleSim
         public float retargetInterval;
         [Tooltip("A battle still going after this many seconds ends, and the side with more value left wins.")]
         public float maxDuration;
+        [Tooltip("An army holding its ground goes for the enemy once any of them comes this close to one of its units. It also stops holding once one of its units has been shot.")]
+        public float holdEngageDistance;
 
-        public static Settings Default => new Settings { retargetInterval = 0.5f, maxDuration = 180f };
+        public static Settings Default => new Settings { retargetInterval = 0.5f, maxDuration = 180f, holdEngageDistance = 4f };
     }
 
     public readonly List<Unit> units = new List<Unit>();
@@ -68,19 +93,34 @@ public sealed class BattleSim
     readonly Settings settings;
     readonly Rect bounds;
     readonly System.Random random;
+    readonly List<Zone> zones = new List<Zone>();
+    // a side that holds stands its ground until the enemy gets close or shoots it; then the whole side goes together
+    readonly bool[] holding = new bool[2];
 
-    public BattleSim(IList<ArmyEntry> armyA, IList<ArmyEntry> armyB, Rect zoneA, Rect zoneB, Rect bounds, int seed, Settings settings)
+    /// <summary>True while a side is still standing its ground.</summary>
+    public bool IsHolding(int side) => holding[side];
+
+    /// <param name="zones">Terrain on the field, or null for open ground everywhere.</param>
+    /// <param name="holdA">Army A stands its ground instead of advancing.</param>
+    /// <param name="holdB">Army B stands its ground instead of advancing.</param>
+    public BattleSim(IList<ArmyEntry> armyA, IList<ArmyEntry> armyB, Rect zoneA, Rect zoneB, Rect bounds, int seed, Settings settings,
+        IList<Zone> zones = null, bool holdA = false, bool holdB = false)
     {
         this.settings = settings;
         this.bounds = bounds;
         random = new System.Random(seed);
-        Spawn(armyA, 0, zoneA, Vector2.right);
-        Spawn(armyB, 1, zoneB, Vector2.left);
+        if (zones != null)
+            foreach (var zone in zones)
+                if (zone.terrain != null && zone.radii.x > 0f && zone.radii.y > 0f)
+                    this.zones.Add(zone);
+        Spawn(armyA, 0, zoneA, Vector2.right, holdA);
+        Spawn(armyB, 1, zoneB, Vector2.left, holdB);
         CheckEnd();
     }
 
-    void Spawn(IList<ArmyEntry> army, int side, Rect zone, Vector2 facing)
+    void Spawn(IList<ArmyEntry> army, int side, Rect zone, Vector2 facing, bool holds)
     {
+        holding[side] = holds;
         if (army == null)
             return;
         foreach (var entry in army)
@@ -120,6 +160,24 @@ public sealed class BattleSim
         return true;
     }
 
+    /// <summary>The terrain under a point, or null on open ground. Where zones overlap the first one wins.</summary>
+    public TerrainType TerrainAt(Vector2 point)
+    {
+        for (int i = 0; i < zones.Count; i++)
+            if (zones[i].Distance(point) < 1f)
+                return zones[i].terrain;
+        return null;
+    }
+
+    /// <summary>Ground height at a point, for the view.</summary>
+    public float HeightAt(Vector2 point)
+    {
+        float height = 0f;
+        for (int i = 0; i < zones.Count; i++)
+            height = Mathf.Max(height, zones[i].Height(point));
+        return height;
+    }
+
     public void Tick()
     {
         if (Winner != Running)
@@ -148,7 +206,10 @@ public sealed class BattleSim
             if (shot.age < shot.duration)
                 continue;
             if (shot.hits && shot.target.Alive)
+            {
                 shot.target.pendingDamage += shot.damage;
+                shot.target.pendingShot = true;
+            }
             projectiles.RemoveAt(i);
         }
 
@@ -161,6 +222,8 @@ public sealed class BattleSim
             if (unit.Alive)
             {
                 unit.health -= unit.pendingDamage;
+                if (unit.pendingShot)
+                    holding[unit.side] = false;
                 if (unit.health <= 0f)
                 {
                     unit.health = 0f;
@@ -168,6 +231,7 @@ public sealed class BattleSim
                 }
             }
             unit.pendingDamage = 0f;
+            unit.pendingShot = false;
         }
 
         Separate();
@@ -201,14 +265,30 @@ public sealed class BattleSim
         float distance = offset.magnitude;
         Vector2 direction = distance > 0.0001f ? offset / distance : unit.facing;
         float gap = distance - type.radius - target.type.radius;
+        var ground = TerrainAt(unit.position);
+        var targetGround = TerrainAt(target.position);
+
         bool shooting = type.IsRanged && gap > type.tooCloseToShoot;
-        float reach = shooting ? type.range : type.meleeReach;
+        float reach = type.meleeReach;
+        if (shooting)
+        {
+            reach = type.range * (ground != null ? ground.shooterRange : 1f);
+            if (targetGround != null && targetGround.hiddenBeyond > 0f)
+                reach = Mathf.Min(reach, targetGround.hiddenBeyond);
+        }
 
         unit.cooldown -= Step;
         unit.facing = direction;
         if (gap > reach)
         {
-            float move = Mathf.Min(type.speed * Step, gap - reach + 0.01f);
+            if (holding[unit.side])
+            {
+                if (gap > settings.holdEngageDistance)
+                    return;
+                holding[unit.side] = false;
+            }
+            float speed = type.speed * (ground != null ? ground.SpeedFor(type) : 1f);
+            float move = Mathf.Min(speed * Step, gap - reach + 0.01f);
             unit.position += direction * move;
             unit.movedSinceAttack += move;
             return;
@@ -222,22 +302,26 @@ public sealed class BattleSim
         if (shooting)
         {
             unit.cooldown = type.rangedInterval;
-            bool hits = random.NextDouble() < type.accuracy;
+            bool hits = random.NextDouble() < type.accuracy * (targetGround != null ? targetGround.cover : 1f);
             Vector2 end = target.position;
             if (!hits)
                 end += new Vector2((float)random.NextDouble() - 0.5f, (float)random.NextDouble() - 0.5f) * 3f;
             projectiles.Add(new Projectile
             {
                 from = unit, target = target, start = unit.position, end = end,
-                duration = Mathf.Max(0.05f, distance / type.projectileSpeed), hits = hits, damage = damage * type.rangedDamage,
+                duration = Mathf.Max(0.05f, distance / type.projectileSpeed), hits = hits,
+                damage = damage * type.rangedDamage * (ground != null ? ground.shooterDamage : 1f),
             });
         }
         else
         {
             unit.cooldown = type.meleeInterval;
             damage *= type.meleeDamage;
-            if (type.chargeMultiplier > 1f && unit.movedSinceAttack >= type.chargeDistance)
+            bool chargeGround = (ground == null || ground.allowsCharge) && (targetGround == null || targetGround.allowsCharge);
+            if (chargeGround && type.chargeMultiplier > 1f && unit.movedSinceAttack >= type.chargeDistance)
                 damage *= type.chargeMultiplier;
+            if (targetGround != null && targetGround != ground)
+                damage *= targetGround.meleeDamageFromOutside;
             target.pendingDamage += damage;
         }
         unit.movedSinceAttack = 0f;
@@ -314,7 +398,7 @@ public sealed class BattleSim
         return value;
     }
 
-    /// <summary>One line per side: who won, and how many of each type are left out of how many.</summary>
+    /// <summary>One line: who won, and how many of each type each side has left out of how many.</summary>
     public string Describe()
     {
         var text = new StringBuilder();
@@ -348,9 +432,10 @@ public sealed class BattleSim
     }
 
     /// <summary>Plays a whole battle with no graphics and returns it finished.</summary>
-    public static BattleSim RunToEnd(IList<ArmyEntry> armyA, IList<ArmyEntry> armyB, Rect zoneA, Rect zoneB, Rect bounds, int seed, Settings settings)
+    public static BattleSim RunToEnd(IList<ArmyEntry> armyA, IList<ArmyEntry> armyB, Rect zoneA, Rect zoneB, Rect bounds, int seed, Settings settings,
+        IList<Zone> zones = null, bool holdA = false, bool holdB = false)
     {
-        var sim = new BattleSim(armyA, armyB, zoneA, zoneB, bounds, seed, settings);
+        var sim = new BattleSim(armyA, armyB, zoneA, zoneB, bounds, seed, settings, zones, holdA, holdB);
         while (sim.Winner == Running)
             sim.Tick();
         return sim;
