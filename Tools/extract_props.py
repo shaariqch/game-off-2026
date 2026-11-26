@@ -11,10 +11,31 @@ PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JOBS = {
     # package file or folder -> asset paths inside it; everything they reference comes along, e.g.
     # r"E:\Game Assets\Synty\POLYGON - Icons Pack": ["Assets/Synty/PolygonIcons/Prefabs/SM_Icon_Gem_01.prefab"],
+    # battle test scene: soldiers, a few weapons, banners and field dressing
+    r"E:\Game Assets\Synty\POLYGON - Fantasy Kingdom Pack": [
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Characters/SM_Chr_Soldier_Male_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Characters/SM_Chr_Soldier_Female_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Characters/SM_Chr_Peasant_Male_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Characters/SM_Chr_Peasant_Female_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Characters/SM_Chr_Rider_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Characters/Attachments/SM_Chr_Attach_Soldier_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Weapons/SM_Wep_Spear_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Weapons/SM_Wep_Shield_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Weapons/SM_Wep_Sword_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Props/Banners/SM_Prop_Battle_Banner_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Props/Banners/SM_Prop_Battle_Banner_02.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Props/Banners/SM_Prop_Battle_Banner_03.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Rock_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Rock_02.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Grass_Tuft_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Grass_Tuft_02.prefab",
+    ],
 }
 # packs already partly imported somewhere else; new files from them go there too
 REMAP = {
     # "Assets/Synty/PolygonWesternFrontier/": "Assets/ThirdParty/Synty/PolygonWesternFrontier/",
+    # the repository is public: everything from Synty stays in the git-ignored ThirdParty folder
+    "Assets/Synty/": "Assets/_Project/ThirdParty/Synty/",
 }
 # python Tools/extract_props.py icons: only the jobs whose pack name contains that word, to skip re-reading the rest
 if len(sys.argv) > 1:

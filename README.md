@@ -62,7 +62,9 @@ The code is here to be read; the playable game is the build on itch.io.
 
 ## Third-party assets
 
-None in the game yet.
+| Pack | Author | Used for | Licence | In this repository |
+|---|---|---|---|---|
+| POLYGON - Fantasy Kingdom Pack | Synty Studios | Soldiers, weapons, banners and field props | Synty Store licence | No |
 
 <!-- One row per pack: name, author, what it's used for, licence, "not in this repository". -->
 
