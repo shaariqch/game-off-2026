@@ -16,8 +16,26 @@ public class UnitType : ScriptableObject
         public float targetWeight;
     }
 
+    /// <summary>Where a type stands in the army's formation and how it fights in it.</summary>
+    public enum Role
+    {
+        /// <summary>Foot soldiers in the battle line, which marches together and fights where it meets the enemy.</summary>
+        Line,
+        /// <summary>Behind the line, shooting over it.</summary>
+        Ranged,
+        /// <summary>On the wings. Rides around the enemy's flank and charges.</summary>
+        Cavalry,
+    }
+
     [Header("Market")]
     [Min(1)] public int cost = 10;
+
+    [Header("Battle role")]
+    public Role role;
+    [Tooltip("Lower numbers stand nearer the front of the formation.")]
+    public int rank;
+    [Tooltip("Takes a cavalry charge from the front without being knocked back, and staggers the rider instead.")]
+    public bool bracesCharge;
 
     [Header("Body")]
     [Min(1f)] public float health = 40f;
@@ -55,6 +73,7 @@ public class UnitType : ScriptableObject
     [Min(0.1f)] public float visualScale = 1f;
 
     public bool IsRanged => rangedDamage > 0f;
+    public bool IsCavalry => role == Role.Cavalry;
 
     public float DamageAgainst(UnitType other)
     {

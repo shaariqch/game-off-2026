@@ -13,10 +13,13 @@ MonoBehaviour:
   m_Name: Spearmen
   m_EditorClassIdentifier: Assembly-CSharp::UnitType
   cost: 20
+  role: 0
+  rank: 0
+  bracesCharge: 1
   health: 80
   speed: 2.6
   radius: 0.42
-  meleeDamage: 4.45
+  meleeDamage: 3.88
   meleeInterval: 1
   meleeReach: 0.6
   chargeMultiplier: 1

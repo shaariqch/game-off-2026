@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MoreMountains.Feedbacks;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -6,6 +7,9 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Runs a <see cref="BattleSim"/> in the scene: spawns a figure for every unit, moves them as the battle plays,
 /// flies the arrows and logs the result. Enter starts another battle with the same armies.
+/// The feel comes from More Mountains' Feel, driven from code: camera shake on the Cinemachine camera
+/// (an MMCinemachineCameraShaker), freeze frames and slow motion (MMTimeManager), a lens zoom for big moments
+/// (MMCinemachineZoom) and a scale spring on every figure that squashes when it's hit.
 /// </summary>
 public class BattleView : MonoBehaviour
 {
@@ -19,10 +23,10 @@ public class BattleView : MonoBehaviour
     [SerializeField] bool armyBHolds = true;
 
     [Header("Field")]
-    [Tooltip("Centre of each army's spawn area.")]
+    [Tooltip("Each army's formation is centred on its spawn point.")]
     [SerializeField] Transform spawnA;
     [SerializeField] Transform spawnB;
-    [Tooltip("Spawn area size: x across the field (towards the enemy), y along the line.")]
+    [Tooltip("Spawn area size, only drawn as a guide: x across the field (towards the enemy), y along the line.")]
     [SerializeField] Vector2 spawnSize = new Vector2(8f, 22f);
     [Tooltip("Units can't leave this area, centred on this object: x across, y deep.")]
     [SerializeField] Vector2 fieldSize = new Vector2(48f, 28f);
@@ -46,11 +50,9 @@ public class BattleView : MonoBehaviour
     [SerializeField, Min(0.01f)] float cameraForgetTime = 2.5f;
 
     [Header("Figures")]
-    [Tooltip("Flat disc under each unit, coloured by side.")]
-    [SerializeField] Mesh markerMesh;
-    [SerializeField] Material markerMaterialA;
-    [SerializeField] Material markerMaterialB;
-    [SerializeField, Min(0f)] float markerHeight = 0.08f;
+    [Tooltip("Each side's figures are drawn on this rendering layer, which picks their outline colour (Linework's Wide Outline on the URP renderers).")]
+    [SerializeField] RenderingLayerMask outlineLayerA;
+    [SerializeField] RenderingLayerMask outlineLayerB;
     [Tooltip("Name of the bone a weapon is parented to.")]
     [SerializeField] string weaponBone = "Hand_R";
     [SerializeField] Vector3 weaponPosition;
@@ -65,6 +67,8 @@ public class BattleView : MonoBehaviour
     [Tooltip("Seconds a dying figure takes to fall over, then how long it lies there before it's removed.")]
     [SerializeField, Min(0.01f)] float fallTime = 0.35f;
     [SerializeField, Min(0f)] float corpseTime = 4f;
+    [Tooltip("How hard a hit squashes the figure it lands on, through its scale spring. A charge squashes three times as hard.")]
+    [SerializeField, Min(0f)] float hitSquash = 4f;
 
     [Header("Arrows")]
     [SerializeField] Mesh arrowMesh;
@@ -73,6 +77,41 @@ public class BattleView : MonoBehaviour
     [Tooltip("Height of an arrow's arc as a share of the distance it flies.")]
     [SerializeField, Min(0f)] float arrowArc = 0.18f;
     [SerializeField, Min(0f)] float arrowStartHeight = 1.4f;
+
+    [Header("Effects")]
+    [Tooltip("Soft round particle material that uses the particle's colour, for dust and hits.")]
+    [SerializeField] Material particleMaterial;
+    [SerializeField] Color dustColour = new Color(0.66f, 0.58f, 0.46f, 0.6f);
+    [SerializeField] Color hitColour = new Color(0.45f, 0.06f, 0.05f, 1f);
+    [SerializeField] Color sparkColour = new Color(1f, 0.85f, 0.55f, 1f);
+    [Tooltip("Dust puffs a second kicked up by riding cavalry.")]
+    [SerializeField, Min(0f)] float cavalryDust = 14f;
+
+    [Header("Feel")]
+    [Tooltip("Camera shake frequency, then its size (Cinemachine noise amplitude) and length in seconds for each kind of moment.")]
+    [SerializeField] float shakeFrequency = 22f;
+    [SerializeField] Vector2 contactShake = new Vector2(1.2f, 0.35f);
+    [SerializeField] Vector2 chargeShake = new Vector2(1.6f, 0.3f);
+    [SerializeField] Vector2 bracedShake = new Vector2(0.9f, 0.2f);
+    [SerializeField] Vector2 riderDeathShake = new Vector2(0.6f, 0.2f);
+    [SerializeField] Vector2 endShake = new Vector2(1.4f, 0.5f);
+    [Tooltip("Seconds the battle freezes when a charge lands.")]
+    [SerializeField, Min(0f)] float chargeFreeze = 0.06f;
+
+    [Header("Big moments")]
+    [Tooltip("Time slows and the camera pushes in when the lines meet, when cavalry charge and on the final kill. Real seconds between two moments.")]
+    [SerializeField, Min(0f)] float momentCooldown = 7f;
+    [Tooltip("Time scale and real seconds of slow motion when the lines meet, for a charge, and at the end.")]
+    [SerializeField] Vector2 contactSlow = new Vector2(0.35f, 1.1f);
+    [SerializeField] Vector2 chargeSlow = new Vector2(0.25f, 1.2f);
+    [SerializeField] Vector2 endSlow = new Vector2(0.2f, 2.2f);
+    [Tooltip("Lens field of view during a moment, and seconds to zoom in and out.")]
+    [SerializeField] float momentFieldOfView = 21f;
+    [SerializeField, Min(0.01f)] float momentZoomTime = 0.35f;
+    [Tooltip("How strongly the camera leans towards a moment: its weight in the camera group against 1 for each unit.")]
+    [SerializeField, Min(0f)] float momentFocusWeight = 6f;
+    [Tooltip("How fast slow motion eases in and out.")]
+    [SerializeField, Min(0.1f)] float slowLerpSpeed = 8f;
 
     [Header("Sounds (all optional)")]
     [SerializeField] AudioSource audioSource;
@@ -84,17 +123,25 @@ public class BattleView : MonoBehaviour
     [SerializeField] AudioClip deathClip;
     // TODO: a short fanfare or horn for the end of the battle
     [SerializeField] AudioClip battleEndClip;
+    // TODO: galloping hooves into a crash of bodies and shields, played when a cavalry charge lands
+    [SerializeField] AudioClip chargeClip;
+    // TODO: a big shout and a clash of shields, played when the two battle lines meet
+    [SerializeField] AudioClip contactClip;
 
     sealed class Figure
     {
         /// <summary>Follows the unit smoothly; the camera watches this.</summary>
         public Transform root;
-        /// <summary>Body and marker. Lunges and falling over happen here, so they don't shake the camera.</summary>
+        /// <summary>The body. Lunges, squashes and falling over happen here, so they don't shake the camera.</summary>
         public Transform visual;
+        public Renderer[] renderers;
+        public MMSpringScale spring;
         public bool placed;
         public float seenAttackTime = -1f;
         public bool seenDeath;
+        public bool landed;
         public float yaw;
+        public float dustDebt;
     }
 
     BattleSim sim;
@@ -103,9 +150,27 @@ public class BattleView : MonoBehaviour
     readonly List<Transform> arrows = new List<Transform>();
     float stepDebt;
     bool reported;
+    ParticleSystem dust, hits;
+    MMChannelData channel;
+    Transform focus;
+    float focusWeight, focusUntil, nextMomentAt;
 
     /// <summary>The battle being shown, or null before the first one.</summary>
     public BattleSim Sim => sim;
+
+    void Awake()
+    {
+        channel = new MMChannelData(MMChannelModes.Int, 0, null);
+        // freeze frames and slow motion. It reads the normal fixed and maximum delta times when it initialises, and
+        // Begin resets the time scale from Start, so it has to be initialised before any Start runs: a reset sent to
+        // an uninitialised manager sets both to zero (which Unity clamps to 0.0001 s, and the battle crawls).
+        if (FindAnyObjectByType<MMTimeManager>() == null)
+            gameObject.AddComponent<MMTimeManager>().Initialization();
+        dust = MakeParticles("Dust", new Vector2(0.8f, 1.6f), new Vector2(0.5f, 1.8f), new Vector2(0.9f, 1.9f), -0.05f);
+        hits = MakeParticles("Hits", new Vector2(0.3f, 0.6f), new Vector2(2f, 5f), new Vector2(0.18f, 0.35f), 1.2f);
+        focus = new GameObject("Moment Focus").transform;
+        focus.SetParent(transform, false);
+    }
 
     void Start()
     {
@@ -127,10 +192,14 @@ public class BattleView : MonoBehaviour
         int steps = Mathf.Min(Mathf.FloorToInt(stepDebt / BattleSim.Step), 50);
         stepDebt = Mathf.Min(stepDebt - steps * BattleSim.Step, BattleSim.Step);
         for (int i = 0; i < steps; i++)
+        {
             sim.Tick();
+            ShowEvents();
+        }
 
         ShowUnits();
         ShowArrows();
+        ShowFocus();
 
         if (sim.Winner != BattleSim.Running && !reported)
         {
@@ -158,6 +227,11 @@ public class BattleView : MonoBehaviour
             cameraGroup.Targets.Clear();
         stepDebt = 0f;
         reported = false;
+        focusWeight = 0f;
+        focusUntil = nextMomentAt = 0f;
+        MMTimeScaleEvent.Trigger(MMTimeScaleMethods.Reset, 1f, 0f, false, 0f, false);
+        if (dust != null) dust.Clear();
+        if (hits != null) hits.Clear();
 
         int battleSeed = seed != 0 ? seed : Random.Range(1, int.MaxValue);
         var zones = TerrainZones();
@@ -176,8 +250,11 @@ public class BattleView : MonoBehaviour
         ShowUnits();
         // added once the figures are in place, so the camera doesn't start from a pile at the origin
         if (cameraGroup != null)
+        {
             foreach (var figure in figures)
                 cameraGroup.AddMember(figure.root, 1f, cameraUnitRadius);
+            cameraGroup.AddMember(focus, 0f, cameraUnitRadius);
+        }
     }
 
     Rect Zone(Transform centre)
@@ -237,20 +314,14 @@ public class BattleView : MonoBehaviour
             }
         }
 
-        var markerMaterial = unit.side == 0 ? markerMaterialA : markerMaterialB;
-        if (markerMesh != null && markerMaterial != null)
-        {
-            var marker = new GameObject("Side Marker");
-            marker.transform.SetParent(visual, false);
-            marker.transform.localPosition = new Vector3(0f, markerHeight, 0f);
-            // sized from the mesh's own bounds, so any flat disc mesh works
-            float width = unit.type.radius * 2.4f / Mathf.Max(0.001f, markerMesh.bounds.size.x);
-            marker.transform.localScale = new Vector3(width, 0.01f, width);
-            marker.AddComponent<MeshFilter>().sharedMesh = markerMesh;
-            var renderer = marker.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = markerMaterial;
-            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        }
+        // the side's outline comes from the rendering layer
+        figure.renderers = visual.GetComponentsInChildren<Renderer>();
+        uint layer = (unit.side == 0 ? outlineLayerA : outlineLayerB).value;
+        foreach (var renderer in figure.renderers)
+            renderer.renderingLayerMask |= layer;
+
+        figure.spring = visual.gameObject.AddComponent<MMSpringScale>();
+        figure.spring.Target = visual;
         return figure;
     }
 
@@ -269,6 +340,7 @@ public class BattleView : MonoBehaviour
 
     void ShowUnits()
     {
+        uint outlines = outlineLayerA.value | outlineLayerB.value;
         for (int i = 0; i < figures.Count; i++)
         {
             var figure = figures[i];
@@ -282,9 +354,13 @@ public class BattleView : MonoBehaviour
                 {
                     figure.seenDeath = true;
                     Play(deathClip);
+                    // the dead lose their side's outline
+                    foreach (var renderer in figure.renderers)
+                        if (renderer != null)
+                            renderer.renderingLayerMask &= ~outlines;
                 }
                 float dead = sim.Time - unit.diedTime;
-                SetCameraWeight(figure, 1f - dead / cameraForgetTime);
+                SetCameraWeight(figure.root, 1f - dead / cameraForgetTime);
                 if (dead > Mathf.Max(fallTime + corpseTime, cameraForgetTime))
                 {
                     Destroy(figure.root.gameObject);
@@ -292,6 +368,11 @@ public class BattleView : MonoBehaviour
                     continue;
                 }
                 float fall = Mathf.Clamp01(dead / fallTime);
+                if (fall >= 1f && !figure.landed)
+                {
+                    figure.landed = true;
+                    Emit(dust, figure.root.position + figure.root.forward * -0.6f, dustColour, 6);
+                }
                 figure.visual.localPosition = Vector3.zero;
                 figure.visual.localRotation = Quaternion.Euler(-90f * fall * fall, 0f, 0f);
                 figure.visual.gameObject.SetActive(dead <= fallTime + corpseTime);
@@ -301,17 +382,33 @@ public class BattleView : MonoBehaviour
             if (unit.lastAttackTime != figure.seenAttackTime)
             {
                 figure.seenAttackTime = unit.lastAttackTime;
-                Play(unit.lastAttackRanged ? arrowShotClip : meleeHitClip);
+                if (unit.lastAttackRanged)
+                    Play(arrowShotClip);
             }
 
             float targetYaw = Mathf.Atan2(unit.facing.x, unit.facing.y) * Mathf.Rad2Deg;
             figure.yaw = Mathf.MoveTowardsAngle(figure.yaw, targetYaw, turnSpeed * Time.deltaTime);
             var position = new Vector3(unit.position.x, sim.HeightAt(unit.position), unit.position.y);
+            var before = figure.root.localPosition;
             figure.root.localPosition = figure.placed
                 ? Vector3.Lerp(figure.root.localPosition, position, 1f - Mathf.Exp(-followSharpness * Time.deltaTime))
                 : position;
             figure.placed = true;
             figure.root.localRotation = Quaternion.Euler(0f, figure.yaw, 0f);
+
+            // riders kick up dust
+            if (unit.type.IsCavalry && Time.deltaTime > 0f)
+            {
+                float moving = (figure.root.localPosition - before).magnitude / Time.deltaTime;
+                if (moving > unit.type.speed * 0.5f)
+                {
+                    figure.dustDebt += cavalryDust * Time.deltaTime;
+                    int puffs = Mathf.FloorToInt(figure.dustDebt);
+                    figure.dustDebt -= puffs;
+                    if (puffs > 0)
+                        Emit(dust, figure.root.position - figure.root.forward * 0.5f, dustColour, puffs);
+                }
+            }
 
             float lunge = 0f;
             if (unit.lastAttackTime >= 0f && !unit.lastAttackRanged)
@@ -324,21 +421,162 @@ public class BattleView : MonoBehaviour
         }
     }
 
-    void SetCameraWeight(Figure figure, float weight)
+    /// <summary>Shows what happened in the last sim step: shakes, squashes, dust and the big moments.</summary>
+    void ShowEvents()
+    {
+        foreach (var e in sim.events)
+        {
+            var at = World(e.position, 0.9f);
+            switch (e.kind)
+            {
+                case BattleSim.EventKind.Contact:
+                    Shake(contactShake);
+                    Play(contactClip);
+                    Moment(e.position, contactSlow);
+                    break;
+                case BattleSim.EventKind.Charge:
+                    Shake(chargeShake);
+                    Play(chargeClip);
+                    Squash(e.other, 3f);
+                    Emit(dust, World(e.position, 0.2f), dustColour, 14);
+                    Emit(hits, at, hitColour, 8);
+                    // the freeze goes on top of any slow motion, so it comes second
+                    Moment(e.position, chargeSlow);
+                    if (chargeFreeze > 0f)
+                        MMFreezeFrameEvent.Trigger(chargeFreeze, 0f);
+                    break;
+                case BattleSim.EventKind.BracedCharge:
+                    Shake(bracedShake);
+                    Play(meleeHitClip);
+                    Squash(e.unit, 2f);
+                    Emit(hits, at, sparkColour, 10);
+                    break;
+                case BattleSim.EventKind.Hit:
+                    Play(meleeHitClip);
+                    Squash(e.other, e.rear ? 1.6f : 1f);
+                    Emit(hits, at, hitColour, e.rear ? 6 : 3);
+                    break;
+                case BattleSim.EventKind.ArrowHit:
+                    Squash(e.other, 0.6f);
+                    Emit(hits, at, hitColour, 2);
+                    break;
+                case BattleSim.EventKind.ArrowMiss:
+                    Emit(dust, World(e.position, 0.05f), dustColour, 2);
+                    break;
+                case BattleSim.EventKind.Death:
+                    if (e.unit.type.IsCavalry)
+                        Shake(riderDeathShake);
+                    break;
+                case BattleSim.EventKind.End:
+                    Shake(endShake);
+                    nextMomentAt = 0f;
+                    Moment(e.position, endSlow);
+                    break;
+            }
+        }
+    }
+
+    Vector3 World(Vector2 point, float lift) => transform.TransformPoint(new Vector3(point.x, sim.HeightAt(point) + lift, point.y));
+
+    void Squash(BattleSim.Unit unit, float strength)
+    {
+        if (unit == null || unit.id >= figures.Count)
+            return;
+        var spring = figures[unit.id].spring;
+        if (spring != null && unit.Alive)
+            spring.Bump(new Vector3(1f, -1.4f, 1f) * hitSquash * strength);
+    }
+
+    void Shake(Vector2 sizeAndTime)
+    {
+        if (sizeAndTime.x > 0f && sizeAndTime.y > 0f)
+            MMCameraShakeEvent.Trigger(sizeAndTime.y, sizeAndTime.x, shakeFrequency, 0f, 0f, 0f, false, channel, true);
+    }
+
+    /// <summary>Slows time and pushes the camera in towards a point, unless another moment was too recent.</summary>
+    void Moment(Vector2 where, Vector2 scaleAndTime)
+    {
+        if (Time.unscaledTime < nextMomentAt || scaleAndTime.y <= 0f)
+            return;
+        nextMomentAt = Time.unscaledTime + scaleAndTime.y + momentCooldown;
+        MMTimeScaleEvent.Trigger(MMTimeScaleMethods.For, scaleAndTime.x, scaleAndTime.y, true, slowLerpSpeed, false);
+        MMCameraZoomEvent.Trigger(MMCameraZoomModes.For, momentFieldOfView, momentZoomTime, scaleAndTime.y, channel, true);
+        focus.localPosition = new Vector3(where.x, sim.HeightAt(where), where.y);
+        focusUntil = Time.unscaledTime + scaleAndTime.y;
+    }
+
+    /// <summary>Eases the camera's lean towards the current moment in and out.</summary>
+    void ShowFocus()
+    {
+        float wanted = Time.unscaledTime < focusUntil ? momentFocusWeight : 0f;
+        focusWeight = Mathf.MoveTowards(focusWeight, wanted, momentFocusWeight * Time.unscaledDeltaTime / Mathf.Max(0.01f, momentZoomTime));
+        SetCameraWeight(focus, focusWeight, false);
+    }
+
+    void SetCameraWeight(Transform member, float weight, bool removeAtZero = true)
     {
         if (cameraGroup == null)
             return;
-        int index = cameraGroup.FindMember(figure.root);
+        int index = cameraGroup.FindMember(member);
         if (index < 0)
             return;
-        if (weight <= 0f)
+        if (weight <= 0f && removeAtZero)
         {
             cameraGroup.Targets.RemoveAt(index);
             return;
         }
-        var member = cameraGroup.Targets[index];
-        member.Weight = weight;
-        cameraGroup.Targets[index] = member;
+        var target = cameraGroup.Targets[index];
+        target.Weight = Mathf.Max(0f, weight);
+        cameraGroup.Targets[index] = target;
+    }
+
+    ParticleSystem MakeParticles(string name, Vector2 lifetime, Vector2 speed, Vector2 size, float gravity)
+    {
+        var holder = new GameObject(name);
+        holder.transform.SetParent(transform, false);
+        // the emission hemisphere points up
+        holder.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+        var system = holder.AddComponent<ParticleSystem>();
+        system.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = system.main;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(lifetime.x, lifetime.y);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(speed.x, speed.y);
+        main.startSize = new ParticleSystem.MinMaxCurve(size.x, size.y);
+        main.gravityModifier = gravity;
+        main.maxParticles = 600;
+        main.playOnAwake = false;
+        var emission = system.emission;
+        emission.enabled = false;
+        var shape = system.shape;
+        shape.shapeType = ParticleSystemShapeType.Hemisphere;
+        shape.radius = 0.25f;
+        var fade = system.colorOverLifetime;
+        fade.enabled = true;
+        var gradient = new Gradient();
+        gradient.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.8f, 0.4f), new GradientAlphaKey(0f, 1f) });
+        fade.color = gradient;
+        var grow = system.sizeOverLifetime;
+        grow.enabled = true;
+        grow.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 1.4f));
+        var drag = system.limitVelocityOverLifetime;
+        drag.enabled = true;
+        drag.drag = 2.5f;
+        var renderer = holder.GetComponent<ParticleSystemRenderer>();
+        renderer.sharedMaterial = particleMaterial;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
+        system.Play();
+        return system;
+    }
+
+    static void Emit(ParticleSystem system, Vector3 position, Color colour, int count)
+    {
+        if (system == null || count <= 0)
+            return;
+        var emit = new ParticleSystem.EmitParams { position = position, startColor = colour, applyShapeToPosition = true };
+        system.Emit(emit, count);
     }
 
     void ShowArrows()
@@ -386,6 +624,12 @@ public class BattleView : MonoBehaviour
     {
         if (clip != null && audioSource != null)
             audioSource.PlayOneShot(clip);
+    }
+
+    void OnDisable()
+    {
+        // leave no slow motion behind
+        MMTimeScaleEvent.Trigger(MMTimeScaleMethods.Reset, 1f, 0f, false, 0f, false);
     }
 
     void OnDrawGizmosSelected()

@@ -13,6 +13,9 @@ MonoBehaviour:
   m_Name: Archers
   m_EditorClassIdentifier: Assembly-CSharp::UnitType
   cost: 20
+  role: 1
+  rank: 0
+  bracesCharge: 0
   health: 30
   speed: 2.8
   radius: 0.4
