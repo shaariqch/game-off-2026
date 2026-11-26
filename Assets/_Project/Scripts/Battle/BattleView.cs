@@ -187,6 +187,13 @@ public class BattleView : MonoBehaviour
         public float dustDebt;
         /// <summary>This rider's current charge has already been checked for a moment.</summary>
         public bool chargeSeen;
+        /// <summary>A mounted figure: the mount's animation, the bone the rider sits on, and the rider's body.</summary>
+        public FigureAnimation mountAnimation;
+        public Transform seat;
+        public Transform rider;
+        public SkinnedMeshRenderer mountFace;
+        /// <summary>The mount has fallen and the rider is on the ground beside it.</summary>
+        public bool dismounted;
     }
 
     BattleSim sim;
@@ -473,6 +480,8 @@ public class BattleView : MonoBehaviour
                 Attach(body.transform, unit.type.weaponPrefab, weaponBone, weaponPosition, weaponRotation);
             foreach (var attachment in unit.type.attachments)
                 Attach(body.transform, attachment.prefab, attachment.bone, attachment.position, attachment.rotation);
+            if (unit.type.mount != null && unit.type.mount.prefab != null)
+                Mount(figure, unit.type.mount, body.transform);
         }
 
         // dressed in the side's colour
@@ -495,6 +504,63 @@ public class BattleView : MonoBehaviour
         figure.spring = visual.gameObject.AddComponent<MMSpringScale>();
         figure.spring.Target = visual;
         return figure;
+    }
+
+    /// <summary>Puts a mount under the figure and the rider on its back.</summary>
+    void Mount(Figure figure, MountType mount, Transform rider)
+    {
+        var animal = Instantiate(mount.prefab, figure.visual);
+        animal.transform.localPosition = Vector3.zero;
+        animal.transform.localRotation = Quaternion.identity;
+        animal.transform.localScale = Vector3.one * mount.scale;
+        foreach (var collider in animal.GetComponentsInChildren<Collider>())
+            collider.enabled = false;
+        if (mount.coat != null)
+            foreach (var renderer in animal.GetComponentsInChildren<Renderer>())
+            {
+                var materials = renderer.sharedMaterials;
+                for (int m = 0; m < materials.Length; m++)
+                    materials[m] = mount.coat;
+                renderer.sharedMaterials = materials;
+            }
+        figure.mountFace = animal.GetComponentInChildren<SkinnedMeshRenderer>();
+        figure.seat = FindDeep(animal.transform, mount.seatBone);
+        figure.rider = rider;
+        var animator = animal.GetComponentInChildren<Animator>();
+        if (animator != null)
+        {
+            // the graph drives it, not the pack's controller
+            animator.runtimeAnimatorController = null;
+            animator.applyRootMotion = false;
+            animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            if (mount.Animated)
+                figure.mountAnimation = new FigureAnimation(animator, mount.idleClip, mount.walkClip, mount.runClip,
+                    mount.walkClipSpeed, mount.runClipSpeed, Random.value, null);
+            else
+                animator.enabled = false;
+        }
+        if (figure.animation != null)
+            figure.animation.Mounted = true;
+        SeatRider(figure, mount);
+    }
+
+    /// <summary>Keeps the rider on the mount's back as the mount's stride lifts and drops it.</summary>
+    void SeatRider(Figure figure, MountType mount)
+    {
+        if (figure.seat == null || figure.rider == null || figure.dismounted)
+            return;
+        figure.rider.position = figure.seat.position + figure.visual.rotation * mount.riderOffset;
+        figure.rider.rotation = figure.visual.rotation;
+    }
+
+    void LateUpdate()
+    {
+        if (sim == null)
+            return;
+        // after the animation pass, so the seat bone is where this frame's stride put it
+        for (int i = 0; i < figures.Count && i < sim.units.Count; i++)
+            if (figures[i].root != null && figures[i].seat != null)
+                SeatRider(figures[i], sim.units[i].type.mount);
     }
 
     /// <summary>Parents a prop to a bone of the body, with its colliders off.</summary>
@@ -546,14 +612,19 @@ public class BattleView : MonoBehaviour
                     Play(deathClip);
                     if (dyingAnimated)
                         figure.animation.Play(Pick(unit.type.deathClips), 0.15f, 0f, true);
+                    if (figure.seat != null)
+                        Unseat(figure, unit.type.mount);
                 }
                 figure.animation?.Update(Time.deltaTime, 0f);
+                figure.mountAnimation?.Update(Time.deltaTime, 0f);
                 float dead = sim.Time - unit.diedTime;
                 SetCameraWeight(figure.root, 1f - dead / cameraForgetTime);
                 if (dead > Mathf.Max(fallTime + corpseTime, cameraForgetTime))
                 {
                     figure.animation?.Dispose();
                     figure.animation = null;
+                    figure.mountAnimation?.Dispose();
+                    figure.mountAnimation = null;
                     Destroy(figure.root.gameObject);
                     figure.root = null;
                     continue;
@@ -606,6 +677,7 @@ public class BattleView : MonoBehaviour
                 float measured = wasPlaced ? moved.magnitude / Time.deltaTime : 0f;
                 figure.speed = Mathf.Lerp(figure.speed, measured, 1f - Mathf.Exp(-speedSmoothing * Time.deltaTime));
                 figure.animation.Update(Time.deltaTime, figure.speed);
+                figure.mountAnimation?.Update(Time.deltaTime, figure.speed);
             }
 
             // riders kick up dust
@@ -664,6 +736,9 @@ public class BattleView : MonoBehaviour
                         Jolt((along + Vector3.down * 0.4f) * chargeJolt * (showing ? 1.6f : 1f));
                     }
                     Play(chargeClip);
+                    // the mount puts its weight into it
+                    if (e.unit.id < figures.Count && figures[e.unit.id].mountAnimation != null && e.unit.type.mount.chargeClip != null)
+                        figures[e.unit.id].mountAnimation.Play(e.unit.type.mount.chargeClip, 0.06f);
                     Squash(e.other, 3f);
                     Flinch(e.other, true);
                     ShowNumber(e.other, e.damage, true);
@@ -712,6 +787,10 @@ public class BattleView : MonoBehaviour
     {
         if (unit == null || !unit.Alive || unit.id >= figures.Count)
             return;
+        // a mount shies at the blow too
+        var mount = figures[unit.id].mountAnimation;
+        if (mount != null && mount.Action == null && unit.type.mount.hitClip != null)
+            mount.Play(unit.type.mount.hitClip, 0.08f);
         var animation = figures[unit.id].animation;
         if (animation == null || (!knockback && animation.Action != null))
             return;
@@ -722,6 +801,25 @@ public class BattleView : MonoBehaviour
             animation.Play(clip, knockback ? 0.08f : 0.12f, knockback ? Mathf.Min(clip.length, simSettings.chargeStagger + 0.3f) : 0f, false, knockback);
     }
 
+    /// <summary>The mount falls, with its dead face on, and the rider drops to the ground beside it.</summary>
+    void Unseat(Figure figure, MountType mount)
+    {
+        figure.dismounted = true;
+        if (figure.mountAnimation != null && mount.deathClip != null)
+            figure.mountAnimation.Play(mount.deathClip, 0.1f, 0f, true);
+        if (figure.mountFace != null && !string.IsNullOrEmpty(mount.deadFace))
+        {
+            int shape = figure.mountFace.sharedMesh.GetBlendShapeIndex(mount.deadFace);
+            if (shape >= 0)
+                figure.mountFace.SetBlendShapeWeight(shape, 100f);
+        }
+        if (figure.rider != null)
+        {
+            figure.rider.localPosition = new Vector3(mount.fallClear, 0f, 0f);
+            figure.rider.localRotation = Quaternion.identity;
+        }
+    }
+
     static AnimationClip Pick(AnimationClip[] clips) => clips != null && clips.Length > 0 ? clips[Random.Range(0, clips.Length)] : null;
 
     void DisposeAnimations()
@@ -730,6 +828,8 @@ public class BattleView : MonoBehaviour
         {
             figure.animation?.Dispose();
             figure.animation = null;
+            figure.mountAnimation?.Dispose();
+            figure.mountAnimation = null;
         }
     }
 

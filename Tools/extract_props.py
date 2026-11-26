@@ -48,12 +48,20 @@ JOBS = {
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Rock_03.prefab",
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Rock_04.prefab",
     ],
+    # the cavalry's horses: Omabuarts' zebra, recoloured as a bay horse (Tools > Battle > Build Horse Coat). This pack
+    # is already imported whole into Assets/Quirky Series here, so the job only matters for a fresh checkout.
+    os.path.join(os.environ.get("APPDATA", ""), r"Unity\Asset Store-5.x\Omabuarts Studio\3D ModelsCharactersAnimals\Quirky Series - Animals Mega Pack Vol 1.unitypackage"): [
+        "Assets/Quirky Series/Ultimate Pack Vol.1/Mega Pack Vol.1/Safari Vol.1/Prefabs/Single LODs/Zebra_LOD0.prefab",
+        "Assets/Quirky Series/Ultimate Pack Vol.1/Mega Pack Vol.1/Safari Vol.1/Animations/Zebra_Animations.fbx",
+        "Assets/Quirky Series/Ultimate Pack Vol.1/Mega Pack Vol.1/Safari Vol.1/Animations/AC_Zebra.controller",
+    ],
 }
 # packs already partly imported somewhere else; new files from them go there too
 REMAP = {
     # "Assets/Synty/PolygonWesternFrontier/": "Assets/ThirdParty/Synty/PolygonWesternFrontier/",
     # the repository is public: everything from Synty stays in the git-ignored ThirdParty folder
     "Assets/Synty/": "Assets/_Project/ThirdParty/Synty/",
+    "Assets/Quirky Series/": "Assets/_Project/ThirdParty/Quirky Series/",
 }
 # python Tools/extract_props.py icons: only the jobs whose pack name contains that word, to skip re-reading the rest
 if len(sys.argv) > 1:

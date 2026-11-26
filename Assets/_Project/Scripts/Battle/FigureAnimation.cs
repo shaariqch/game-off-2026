@@ -46,6 +46,8 @@ public sealed class FigureAnimation
     public AnimationClip Action { get; private set; }
     /// <summary>Holding a final pose (a death) until disposed.</summary>
     public bool Holding => holding;
+    /// <summary>A rider: actions never take the legs (they stay in the saddle), except a held death.</summary>
+    public bool Mounted { get; set; }
 
     /// <param name="upperBodyMask">The body parts an action plays on while the figure moves; null plays actions on the whole body always.</param>
     public FigureAnimation(Animator animator, AnimationClip idle, AnimationClip walk, AnimationClip run, float walkSpeed, float runSpeed,
@@ -129,7 +131,9 @@ public sealed class FigureAnimation
         }
 
         // the legs belong to the action while standing still (or for a whole-body action), to moving otherwise
-        float wanted = !hasMask || actionWholeBody ? 1f : 1f - Mathf.Clamp01((speed - StillSpeed) / (MovingSpeed - StillSpeed));
+        float wanted = !hasMask || holding || (actionWholeBody && !Mounted) ? 1f
+            : Mounted ? 0f
+            : 1f - Mathf.Clamp01((speed - StillSpeed) / (MovingSpeed - StillSpeed));
         legs = Mathf.MoveTowards(legs, wanted, LegsHandover * deltaTime);
         root.SetInputWeight(WholeBodyLayer, action * legs);
         root.SetInputWeight(UpperBodyLayer, action * (1f - legs));

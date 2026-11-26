@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa07c236461d0c041b4e6f9f304fb9be, type: 3}
+  m_Name: War Horse
+  m_EditorClassIdentifier: Assembly-CSharp::MountType
+  prefab: {fileID: 3084013608786634798, guid: 6887aca1d6d77a746848a5090bfc6650, type: 3}
+  coat: {fileID: 2100000, guid: 7a3552a495e3b7a488086234102b4e5f, type: 2}
+  scale: 1.45
+  seatBone: body
+  riderOffset: {x: 0, y: -0.32, z: -0.03}
+  fallClear: 0.9
+  idleClip: {fileID: 7400016, guid: 85cc1e23436c24c4882712876a5f8334, type: 3}
+  walkClip: {fileID: 7400034, guid: 85cc1e23436c24c4882712876a5f8334, type: 3}
+  runClip: {fileID: 7400026, guid: 85cc1e23436c24c4882712876a5f8334, type: 3}
+  walkClipSpeed: 1.6
+  runClipSpeed: 6
+  hitClip: {fileID: 7400014, guid: 85cc1e23436c24c4882712876a5f8334, type: 3}
+  chargeClip: {fileID: 7400000, guid: 85cc1e23436c24c4882712876a5f8334, type: 3}
+  deathClip: {fileID: 7400006, guid: 85cc1e23436c24c4882712876a5f8334, type: 3}
+  deadFace: eyes.dead

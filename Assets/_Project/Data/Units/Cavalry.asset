@@ -42,10 +42,12 @@ MonoBehaviour:
     targetWeight: 1
   visualPrefab: {fileID: 1116677665208918, guid: e11051163540ebf4884417f50c226d1c, type: 3}
   weaponPrefab: {fileID: 1588372535281458, guid: a1179b3754a6656469126cba8b02cba5, type: 3}
+  attachments: []
+  mount: {fileID: 11400000, guid: d63e07be582d51845ae97331b758308f, type: 2}
   visualScale: 1
-  idleClip: {fileID: 3215575822887921774, guid: ed8560f44bf9d4b48b00a743e934cf99, type: 3}
-  walkClip: {fileID: 6048701035611563356, guid: 6f2f17a5242e38648b83ee303844b46c, type: 3}
-  runClip: {fileID: -8897223609662386934, guid: e2c63f8d79a9e3c40bf98d5d8188f390, type: 3}
+  idleClip: {fileID: 7400000, guid: 4ff21a02aa8f40d4ead61280d1fd4f55, type: 2}
+  walkClip: {fileID: 7400000, guid: 4ff21a02aa8f40d4ead61280d1fd4f55, type: 2}
+  runClip: {fileID: 7400000, guid: 4ff21a02aa8f40d4ead61280d1fd4f55, type: 2}
   walkClipSpeed: 1.4
   runClipSpeed: 6
   attackClips:

@@ -84,6 +84,8 @@ public class UnitType : ScriptableObject
     public GameObject weaponPrefab;
     [Tooltip("Anything else the figure carries, each on its own bone: a bow in the left hand, a quiver on the back.")]
     public Attachment[] attachments = new Attachment[0];
+    [Tooltip("What the unit rides, if anything. A rider's actions only move its upper body, and its idle, walk and run clips should all be a seated pose.")]
+    public MountType mount;
     [Min(0.1f)] public float visualScale = 1f;
 
     [Header("Animation (humanoid clips; empty leaves the figure still)")]
