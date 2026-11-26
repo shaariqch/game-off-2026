@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 07053f6fffa22a3449f37a0321108d46, type: 3}
+  m_Name: Cavalry
+  m_EditorClassIdentifier: Assembly-CSharp::UnitType
+  cost: 40
+  health: 120
+  speed: 6.5
+  radius: 0.55
+  meleeDamage: 6.5
+  meleeInterval: 0.9
+  meleeReach: 0.6
+  chargeMultiplier: 3
+  chargeDistance: 5
+  rangedDamage: 0
+  rangedInterval: 1.5
+  range: 18
+  tooCloseToShoot: 1.5
+  projectileSpeed: 22
+  accuracy: 0.8
+  against:
+  - type: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
+    damage: 0.6
+    targetWeight: 1.6
+  - type: {fileID: 11400000, guid: 5dfe9b2bdcccc4a4aa5be328096a2f35, type: 2}
+    damage: 1.5
+    targetWeight: 0.6
+  - type: {fileID: 11400000, guid: e446b0765ca2bc04182feb297332617e, type: 2}
+    damage: 1.4
+    targetWeight: 1
+  visualPrefab: {fileID: 1116677665208918, guid: e11051163540ebf4884417f50c226d1c, type: 3}
+  weaponPrefab: {fileID: 1588372535281458, guid: a1179b3754a6656469126cba8b02cba5, type: 3}
+  visualScale: 1

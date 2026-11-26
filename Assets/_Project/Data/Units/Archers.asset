@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 07053f6fffa22a3449f37a0321108d46, type: 3}
+  m_Name: Archers
+  m_EditorClassIdentifier: Assembly-CSharp::UnitType
+  cost: 20
+  health: 30
+  speed: 2.8
+  radius: 0.4
+  meleeDamage: 1.5
+  meleeInterval: 1
+  meleeReach: 0.6
+  chargeMultiplier: 1
+  chargeDistance: 5
+  rangedDamage: 5
+  rangedInterval: 1.5
+  range: 18
+  tooCloseToShoot: 1.5
+  projectileSpeed: 22
+  accuracy: 0.8
+  against:
+  - type: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
+    damage: 3
+    targetWeight: 1
+  visualPrefab: {fileID: 1074668445682794, guid: 128d74125a472834991824f3f72198b5, type: 3}
+  weaponPrefab: {fileID: 0}
+  visualScale: 1
