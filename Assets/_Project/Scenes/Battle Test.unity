@@ -227534,6 +227534,13 @@ MonoBehaviour:
   numberLifetime: 1
   maxNumbers: 16
   numberUpdateDelay: 0.03
+  numberMerging: 1
+  mergeRadius: 4
+  mergeTime: 0.25
+  mergeBump: 1.35
+  mergeLinger: 0.6
+  numberGrowth: 1.6
+  numberGrowUntil: 60
   shakeFrequency: 22
   contactShake: {x: 1.2, y: 0.35}
   chargeShake: {x: 1.6, y: 0.3}

@@ -109,6 +109,17 @@ public class BattleView : MonoBehaviour
     [SerializeField, Min(1)] int maxNumbers = 16;
     [Tooltip("Seconds between a number's animation steps. Each step rebuilds its mesh, which is most of their cost.")]
     [SerializeField, Min(0f)] float numberUpdateDelay = 0.03f;
+    [Tooltip("Hits close together add up into one running total that new hits fly into, instead of a number per hit.")]
+    [SerializeField] bool numberMerging = true;
+    [Tooltip("Metres within which a new hit joins a number already up.")]
+    [SerializeField, Min(0.1f)] float mergeRadius = 4f;
+    [Tooltip("Seconds a new hit takes to fly into the total, how much the total swells when it lands, and how many extra seconds it stays up.")]
+    [SerializeField, Min(0.01f)] float mergeTime = 0.25f;
+    [SerializeField, Min(1f)] float mergeBump = 1.35f;
+    [SerializeField, Min(0f)] float mergeLinger = 0.6f;
+    [Tooltip("A total grows from its normal size to this many times it as it climbs to Number Grow Until.")]
+    [SerializeField, Min(1f)] float numberGrowth = 1.6f;
+    [SerializeField, Min(2f)] float numberGrowUntil = 60f;
 
     [Header("Feel")]
     [Tooltip("Camera shake frequency, then its size (Cinemachine noise amplitude) and length in seconds for each kind of moment.")]
@@ -197,11 +208,12 @@ public class BattleView : MonoBehaviour
         var templates = new GameObject("Damage Number Templates");
         templates.SetActive(false);
         templates.transform.SetParent(transform, false);
-        hitTemplate = MakeNumberTemplate(hitNumber, templates.transform, numberScale);
-        heavyTemplate = MakeNumberTemplate(heavyNumber != null ? heavyNumber : hitNumber, templates.transform, numberScale * heavyNumberScale);
+        hitTemplate = MakeNumberTemplate(hitNumber, templates.transform, numberScale, "battle hits ");
+        heavyTemplate = MakeNumberTemplate(heavyNumber != null ? heavyNumber : hitNumber, templates.transform, numberScale * heavyNumberScale, "battle heavy hits ");
     }
 
-    DamageNumber MakeNumberTemplate(DamageNumber preset, Transform parent, float scale)
+    /// <param name="group">Numbers only merge with numbers of the same group on the same unit.</param>
+    DamageNumber MakeNumberTemplate(DamageNumber preset, Transform parent, float scale, string group)
     {
         if (preset == null)
             return null;
@@ -225,7 +237,25 @@ public class BattleView : MonoBehaviour
         // the oldest fade out early when a big melee would put more than this on screen
         template.limitActiveInstances = true;
         template.maxActiveInstances = maxNumbers;
-        template.enableCombination = false;
+        // damage in an area adds up: a new hit within Merge Radius of a number already up flies into it, and that
+        // number adds it, swells and stays up a little longer. The oldest number in reach absorbs. Numbers don't
+        // follow their unit, since following would put each unit's numbers in a group of their own.
+        template.spamGroup = group;
+        template.enableCombination = numberMerging;
+        template.combinationSettings.method = DamageNumbersPro.CombinationMethod.ABSORB_NEW;
+        template.combinationSettings.maxDistance = mergeRadius;
+        template.combinationSettings.spawnDelay = 0.08f;
+        template.combinationSettings.absorbDuration = mergeTime;
+        template.combinationSettings.absorberScaleFactor = mergeBump;
+        template.combinationSettings.bonusLifetime = mergeLinger;
+        template.combinationSettings.moveToAbsorber = true;
+        template.combinationSettings.teleportToAbsorber = false;
+        // and the bigger the total, the bigger it's drawn
+        template.enableScaleByNumber = true;
+        template.scaleByNumberSettings.fromNumber = 1f;
+        template.scaleByNumberSettings.toNumber = numberGrowUntil;
+        template.scaleByNumberSettings.fromScale = 1f;
+        template.scaleByNumberSettings.toScale = numberGrowth;
         // every number rebuilds its mesh this often; the preset's 0.0125 s cost about 7 ms a frame for 35 numbers
         template.updateDelay = numberUpdateDelay;
         // the preset's own colour gradient would override the colours set per number
@@ -248,7 +278,7 @@ public class BattleView : MonoBehaviour
         var figure = figures[unit.id];
         if (figure.root == null)
             return;
-        var number = template.Spawn(figure.root.position + Vector3.up * numberHeight, Mathf.Max(1, Mathf.RoundToInt(damage)), figure.root);
+        var number = template.Spawn(figure.root.position + Vector3.up * numberHeight, Mathf.Max(1, Mathf.RoundToInt(damage)));
         number.SetColor(heavy ? heavyNumberColour : hitNumberColour);
     }
 
