@@ -330,6 +330,12 @@ public class BattleView : MonoBehaviour
     /// <summary>Clears the field and starts a new battle with the armies set in the Inspector.</summary>
     public void Begin()
     {
+        // called in Edit mode, it built a whole army into the scene, which then got saved with it
+        if (!Application.isPlaying)
+        {
+            Debug.LogWarning("BattleView.Begin only runs in Play mode.", this);
+            return;
+        }
         if (spawnA == null || spawnB == null)
         {
             Debug.LogError("BattleView needs both spawn points set.", this);
