@@ -8,7 +8,9 @@ using UnityEngine;
 /// frame, held, with the legs bent astride and the hands forward on the reins, set through humanoid muscle values.
 /// Muscle directions on the Synty rig: hip flexion is negative Upper Leg Front-Back, abduction positive In-Out, a
 /// bent knee negative Lower Leg Stretch; an arm comes forward with negative Arm Front-Back and the elbow bends with
-/// negative Forearm Stretch. Build with Tools > Battle > Build Riding Pose; the clip goes to the git-ignored
+/// negative Forearm Stretch. The clip has no foot IK goals, so riders play it with foot IK off: with it on, both
+/// feet were pulled to the same default goal and the legs folded up under the rider. Build with
+/// Tools > Battle > Build Riding Pose; the clip goes to the git-ignored
 /// ThirdParty folder, since it starts from Synty's clip.
 /// </summary>
 public static class RidingPose
@@ -19,9 +21,12 @@ public static class RidingPose
     /// <summary>Muscle values for both sides (the side's name is put in front).</summary>
     static readonly Dictionary<string, float> Sides = new Dictionary<string, float>
     {
-        { "Upper Leg Front-Back", -0.6f },
+        // legs astride the Quirky horse's wide barrel: thighs forward and out, shins hanging down its sides, found by
+        // searching these four for knees and feet outside the barrel (at the War Horse's scale and seat)
+        { "Upper Leg Front-Back", 0.0f },
         { "Upper Leg In-Out", 0.6f },
-        { "Lower Leg Stretch", 0.0f },
+        { "Upper Leg Twist In-Out", 0.5f },
+        { "Lower Leg Stretch", 0.5f },
         { "Foot Up-Down", -0.35f },
         { "Arm Front-Back", -0.25f },
         { "Arm Down-Up", -0.55f },

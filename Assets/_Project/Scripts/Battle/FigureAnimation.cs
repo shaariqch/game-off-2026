@@ -46,8 +46,22 @@ public sealed class FigureAnimation
     public AnimationClip Action { get; private set; }
     /// <summary>Holding a final pose (a death) until disposed.</summary>
     public bool Holding => holding;
-    /// <summary>A rider: actions never take the legs (they stay in the saddle), except a held death.</summary>
-    public bool Mounted { get; set; }
+    /// <summary>
+    /// A rider: actions never take the legs (they stay in the saddle), except a held death. Foot IK is off, since the
+    /// seated pose has no foot goals and IK would pull both feet to the same default point.
+    /// </summary>
+    public bool Mounted
+    {
+        get => mounted;
+        set
+        {
+            mounted = value;
+            for (int i = 0; i < moves.Length; i++)
+                if (moves[i].IsValid())
+                    moves[i].SetApplyFootIK(!value);
+        }
+    }
+    bool mounted;
 
     /// <param name="upperBodyMask">The body parts an action plays on while the figure moves; null plays actions on the whole body always.</param>
     public FigureAnimation(Animator animator, AnimationClip idle, AnimationClip walk, AnimationClip run, float walkSpeed, float runSpeed,
@@ -176,7 +190,7 @@ public sealed class FigureAnimation
         var playable = AnimationClipPlayable.Create(graph, clip);
         playable.SetSpeed(speed);
         playable.SetDuration(clip.length);
-        if (hold)
+        if (hold || mounted)
             playable.SetApplyFootIK(false);
         graph.Connect(playable, 0, mixer, current);
     }

@@ -16,7 +16,7 @@ MonoBehaviour:
   coat: {fileID: 2100000, guid: 7a3552a495e3b7a488086234102b4e5f, type: 2}
   scale: 1.45
   seatBone: body
-  riderOffset: {x: 0, y: -0.32, z: -0.03}
+  riderOffset: {x: 0, y: -0.17, z: -0.03}
   fallClear: 0.9
   idleClip: {fileID: 7400016, guid: 85cc1e23436c24c4882712876a5f8334, type: 3}
   walkClip: {fileID: 7400034, guid: 85cc1e23436c24c4882712876a5f8334, type: 3}
