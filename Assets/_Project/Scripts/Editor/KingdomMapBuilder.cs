@@ -41,6 +41,8 @@ public class KingdomMapBuilder : ScriptableObject
         public Vector2 heightRange = new Vector2(0.4f, 200f);
         [Tooltip("On: also grows in shallow water (reeds, lily pads).")]
         public bool inShallows;
+        [Tooltip("On: also above the snow line.")]
+        public bool onSnow;
     }
 
     [Header("Source")]
@@ -79,10 +81,17 @@ public class KingdomMapBuilder : ScriptableObject
     [Min(1f)] public float detailScale = 22f;
     [Tooltip("Size of the ridges on high ground, in metres.")]
     [Min(1f)] public float ridgeScale = 40f;
+    [Tooltip("Where the mountains begin, as a share of the strip from its south end. South of this, high ground is squashed.")]
+    [Range(0f, 1f)] public float mountainLine = 0.74f;
+    [Tooltip("South of the mountain line, ground above this many metres rises only by Lowland Squash.")]
+    public float lowlandCap = 9f;
+    [Range(0f, 1f)] public float lowlandSquash = 0.35f;
     public int seed = 2026;
 
     [Header("Water")]
     public Material water;
+    [Tooltip("A dark plane under the sea, so deep water reads as deep instead of showing the sky through it.")]
+    public Material seaFloorMaterial;
     [Tooltip("How far lake beds sit below the lake's surface, in metres.")]
     [Min(0.2f)] public float lakeDepth = 2.5f;
     [Tooltip("Land this close to a lake is kept just above its water, in metres.")]
@@ -102,6 +111,12 @@ public class KingdomMapBuilder : ScriptableObject
 
     [Header("Ground layers")]
     public TerrainLayer grass;
+    [Tooltip("Drier grass, in broad patches across open land.")]
+    public TerrainLayer grassDry;
+    [Tooltip("Grass with flowers, in smaller patches across open land.")]
+    public TerrainLayer grassFlowers;
+    [Tooltip("Size of the dry and flowery patches, in metres.")]
+    [Min(5f)] public float grassPatchScale = 60f;
     public TerrainLayer forestFloor;
     public TerrainLayer pineFloor;
     public TerrainLayer swampGrass;
@@ -311,6 +326,20 @@ public class KingdomMapBuilder : ScriptableObject
     {
         int radius = Mathf.Max(1, Mathf.RoundToInt(smoothing / step));
         Blur(heights, nx, nz, radius, 3);
+        // hills south of the mountains stay hills: Azgaar's lone peaks would otherwise stand as tall as the range
+        for (int iz = 0; iz < nz; iz++)
+        {
+            float lowland = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(mountainLine - 0.06f, mountainLine + 0.02f, (float)iz / (nz - 1)));
+            if (lowland <= 0f)
+                continue;
+            for (int ix = 0; ix < nx; ix++)
+            {
+                int s = iz * nx + ix;
+                float h = heights[s];
+                if (h > lowlandCap)
+                    heights[s] = Mathf.Lerp(h, lowlandCap + (h - lowlandCap) * lowlandSquash, lowland);
+            }
+        }
         var rng = new Random(seed);
         float ox = (float)rng.NextDouble() * 1000f, oz = (float)rng.NextDouble() * 1000f;
         for (int iz = 0; iz < nz; iz++)
@@ -624,7 +653,7 @@ public class KingdomMapBuilder : ScriptableObject
     {
         if (!AssetDatabase.IsValidFolder(outputFolder))
             Directory.CreateDirectory(outputFolder);
-        var layers = new List<TerrainLayer> { grass, forestFloor, pineFloor, swampGrass, mud, shore, rock, snow };
+        var layers = new List<TerrainLayer> { grass, grassDry, grassFlowers, forestFloor, pineFloor, swampGrass, mud, shore, rock, snow };
         float tileLength = length / tiles;
         var land = new GameObject("Land");
         land.transform.SetParent(root.transform, false);
@@ -649,8 +678,32 @@ public class KingdomMapBuilder : ScriptableObject
             for (int x = 0; x < res; x++)
                 h[z, x] = Mathf.Clamp01((heights[(offset + z) * nx + x] - seaFloor) / terrainHeight);
             data.SetHeights(0, 0, h);
-            data.terrainLayers = layers.ToArray();
-            data.SetAlphamaps(0, 0, Splat(t, ares, layers.Count));
+            // each tile keeps only the layers it uses (at most 8, two passes), most used first
+            var full = Splat(t, ares, layers.Count);
+            var use = new List<int>();
+            var totals = new float[layers.Count];
+            for (int z = 0; z < ares; z++)
+            for (int x = 0; x < ares; x++)
+            for (int k = 0; k < layers.Count; k++)
+                totals[k] += full[z, x, k];
+            for (int k = 0; k < layers.Count; k++)
+                if (layers[k] != null && totals[k] > ares * ares * 0.0005f)
+                    use.Add(k);
+            use.Sort((a, b) => totals[b].CompareTo(totals[a]));
+            if (use.Count > 8)
+                use.RemoveRange(8, use.Count - 8);
+            var maps = new float[ares, ares, use.Count];
+            for (int z = 0; z < ares; z++)
+            for (int x = 0; x < ares; x++)
+            {
+                float sum = 0f;
+                for (int i = 0; i < use.Count; i++)
+                    sum += maps[z, x, i] = full[z, x, use[i]];
+                for (int i = 0; i < use.Count; i++)
+                    maps[z, x, i] = sum > 0f ? maps[z, x, i] / sum : (i == 0 ? 1f : 0f);
+            }
+            data.terrainLayers = use.ConvertAll(k => layers[k]).ToArray();
+            data.SetAlphamaps(0, 0, maps);
             data.treeInstances = Array.Empty<TreeInstance>();
             EditorUtility.SetDirty(data);
 
@@ -693,11 +746,17 @@ public class KingdomMapBuilder : ScriptableObject
             float open = Bilinear(cover[(int)Cover.Open], x, z), broad = Bilinear(cover[(int)Cover.Broadleaf], x, z);
             float pine = Bilinear(cover[(int)Cover.Conifer], x, z), wet = Bilinear(cover[(int)Cover.Wetland], x, z);
             Array.Clear(w, 0, count);
-            w[0] = open + 0.05f;
-            w[1] = broad;
-            w[2] = pine + (biome[s] == 11 ? 0.6f : 0f);
-            w[3] = wet * 0.65f;
-            w[4] = wet * 0.35f;
+            float openLand = open + 0.05f;
+            float dry = Mathf.SmoothStep(0f, 0.85f, Mathf.InverseLerp(0.5f, 0.72f, Mathf.PerlinNoise(x / grassPatchScale + 51.3f, z / grassPatchScale + 7.7f)));
+            float flowers = Mathf.SmoothStep(0f, 0.7f, Mathf.InverseLerp(0.58f, 0.78f, Mathf.PerlinNoise(x / (grassPatchScale * 0.45f) - 13.1f, z / (grassPatchScale * 0.45f) + 91.4f)));
+            flowers *= 1f - dry;
+            w[0] = openLand * (1f - dry - flowers);
+            w[1] = openLand * dry;
+            w[2] = openLand * flowers;
+            w[3] = broad;
+            w[4] = pine + (biome[s] == 11 ? 0.6f : 0f);
+            w[5] = wet * 0.65f;
+            w[6] = wet * 0.35f;
             Normalise(w);
             // shores: the beach by the sea, the banks of rivers and lakes
             float beach = Mathf.InverseLerp(beachHeight + 0.6f, beachHeight - 0.3f, h)
@@ -705,11 +764,11 @@ public class KingdomMapBuilder : ScriptableObject
             float riverEdge = riverDistance[s] < float.MaxValue
                 ? Mathf.InverseLerp(riverHalf[s] + 0.9f, riverHalf[s] + 0.1f, riverDistance[s]) : 0f;
             float lakeEdge = lakeOf[s] >= 0 ? 1f : 0f;
-            Overlay(w, 5, Mathf.Max(beach, Mathf.Max(riverEdge, lakeEdge)));
+            Overlay(w, 7, Mathf.Max(beach, Mathf.Max(riverEdge, lakeEdge)));
             float rocky = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(rockSlope.x, rockSlope.y, Bilinear(slope, x, z)));
-            Overlay(w, 6, rocky);
+            Overlay(w, 8, rocky);
             float snowy = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(SnowLine(z), SnowLine(z) + snowBlend, h)) * (1f - rocky * 0.55f);
-            Overlay(w, 7, snowy);
+            Overlay(w, 9, snowy);
             for (int k = 0; k < count; k++)
                 maps[az, ax, k] = w[k];
         }
@@ -787,7 +846,7 @@ public class KingdomMapBuilder : ScriptableObject
                     continue;
                 if (Bilinear(slope, px, pz) > set.maxSlope)
                     continue;
-                if (set.cover != Cover.Rocky && h > SnowLine(pz) + snowBlend * 0.5f)
+                if (!set.onSnow && h > SnowLine(pz) + snowBlend * 0.5f)
                     continue;
                 bool cleared = false;
                 foreach (var c in clearings)
@@ -833,16 +892,40 @@ public class KingdomMapBuilder : ScriptableObject
         int count = 0;
 
         // the sea: one plane at sea level, well past the edges so the land fades out over water
-        var sea = new Mesh { name = "Sea" };
-        float pad = 2000f;
-        sea.vertices = new[] { new Vector3(-pad, 0, -pad), new Vector3(width + pad, 0, -pad), new Vector3(-pad, 0, length + pad), new Vector3(width + pad, 0, length + pad) };
-        sea.triangles = new[] { 0, 2, 1, 1, 2, 3 };
+        // a grid rather than one huge quad: Flat Kit's depth and foam went wrong across triangles kilometres wide
+        var sea = new Mesh { name = "Sea", indexFormat = IndexFormat.UInt32 };
+        float pad = 800f, cell = 32f;
+        int cx = Mathf.CeilToInt((width + pad * 2) / cell), cz = Mathf.CeilToInt((length + pad * 2) / cell);
+        var seaVerts = new List<Vector3>();
+        var seaTris = new List<int>();
+        for (int z = 0; z <= cz; z++)
+        for (int x = 0; x <= cx; x++)
+            seaVerts.Add(new Vector3(-pad + x * cell, 0f, -pad + z * cell));
+        for (int z = 0; z < cz; z++)
+        for (int x = 0; x < cx; x++)
+        {
+            int a = z * (cx + 1) + x;
+            seaTris.AddRange(new[] { a, a + cx + 1, a + 1, a + 1, a + cx + 1, a + cx + 2 });
+        }
+        sea.SetVertices(seaVerts);
+        sea.SetTriangles(seaTris, 0);
         sea.RecalculateNormals();
         sea.RecalculateBounds();
         AssetDatabase.CreateAsset(sea, path);
         holder = sea;
         AddWater(waterRoot, null, sea, "Sea");
         count++;
+        if (seaFloorMaterial != null)
+        {
+            var floor = new Mesh { name = "Sea Floor" };
+            float y = seaFloor + 0.3f;
+            floor.vertices = new[] { new Vector3(-pad, y, -pad), new Vector3(width + pad, y, -pad), new Vector3(-pad, y, length + pad), new Vector3(width + pad, y, length + pad) };
+            floor.triangles = new[] { 0, 2, 1, 1, 2, 3 };
+            floor.RecalculateNormals();
+            floor.RecalculateBounds();
+            AddWater(waterRoot, holder, floor, "Sea Floor");
+            waterRoot.transform.Find("Sea Floor").GetComponent<MeshRenderer>().sharedMaterial = seaFloorMaterial;
+        }
 
         // lakes: a grid over each lake's samples, at its surface
         var lakeVerts = new List<Vector3>();
