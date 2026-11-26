@@ -44,6 +44,8 @@ Editor tools and code libraries (needed to compile if the game's code uses them)
 | Spline Architect | Mike Danielsson | `Assets/SplineArchitect` |
 | Sound Shapes | TelePresent Games | `Assets/TelePresent` |
 | vFolders 2, vFavorites 2 | kubacho lab | `Assets/vFolders`, `Assets/vFavorites` |
+| Flat Kit: Toon Shading and Water | Dustyroom | `Assets/FlatKit` |
+| Linework: Outlines and Edge Detection | Alexander Ameye | `Packages/dev.ameye.linework` |
 
 Art, audio and other content packs used by the game will be listed under "Third-party assets" below as they are
 added.

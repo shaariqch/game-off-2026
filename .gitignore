@@ -167,6 +167,9 @@ crashlytics-build.properties
 /[Aa]ssets/_Project/ThirdParty/
 /[Aa]ssets/_Project/ThirdParty.meta
 
+# Purchased Asset Store packages that install under Packages/ instead of Assets/
+/[Pp]ackages/dev.ameye.linework/
+
 # Builds and release archives
 /[Bb]uilds/
 /[Rr]elease/
