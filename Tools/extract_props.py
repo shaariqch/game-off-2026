@@ -48,6 +48,22 @@ JOBS = {
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Rock_03.prefab",
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Rock_04.prefab",
     ],
+    # the kingdom map, from Synty's three nature biome packs. Entries starting "re:" are patterns matched against the
+    # paths inside the package. Meadow Forest: the broadleaf woods, birches, orchards, meadow rocks and the grass,
+    # dirt and rock ground layers. Alpine Mountain: pines, mountain rocks and cliffs, snow and rocky ground.
+    # Swamp Marshland: swamp trees, reeds, lily pads and mud.
+    r"E:\Game Assets\Synty\POLYGON - Meadow Forest - Nature Biome": [
+        r"re:PNB_Meadow_Forest/Prefabs/SM_Env_(Tree_(Meadow|Birch|Fruit)_0\d|Bush_0\d|Grass_Bush_01|Rock_(0\d|Round_01|Small_01|Pile_0[1-4]|Cliff_0[1-3])|Lillies_0\d|Grass_(Tall|Med)_Clump_0[1-3]|Water_Plane_01)\.prefab$",
+        r"re:PNB_Meadow_Forest/.*Terrain_Meadow_(Grass_01|Grass_02|Grass_Flowers_01|Grass_Leaves_01|Grass_Pebbles_01|Dirt_01|Mud_01|Rock_01|Rock_Moss_01|Moss_Rock_01|Gravel_01)\.terrainlayer$",
+    ],
+    r"E:\Game Assets\Synty\POLYGON - Alpine Mountain - Nature Biome": [
+        r"re:PNB_Alpine_Mountain/Prefabs/SM_Env_(Pine_0\d|Pine_NoLeaves_01|Rock_0\d+|Rock_Cliff_0\d|Rock_Rough_0\d|Rock_River_0\d|Bush_0[12]|Bush_Flower_01|Moss_Lumps_0\d)\.prefab$",
+        r"re:PNB_Alpine_Mountain/.*/(layer_snow_[^/]*|SnowCliff|Pine_Moss_01|Pine_Grass|Pine_Dirt|RiverRocks_01|Grass_01|Dirt_01)\.terrainlayer$",
+    ],
+    os.path.join(os.environ.get("APPDATA", ""), r"Unity\Asset Store-5.x\Synty Studios\3D ModelsEnvironmentsLandscapes\POLYGON - Swamp Marshland - Nature Biomes - 3D Environment Art by Synty.unitypackage"): [
+        r"re:PNB_Swamp_Marshland/Prefabs/SM_Env_(Tree_Swamp_0\d|Tree_Mangrove_0\d|Tree_Dead_0[12]|Reeds_0\d|SwampGrass_(Group_0\d|Tall_01|Medium_01)|LillyPads_0\d|MossMound_0\d|Bush_Bramble_0\d|Swamp_Log_0[12])\.prefab$",
+        r"re:PNB_Swamp_Marshland/.*/Terrain_(Mud_01|Grass_Swamp_01|Moss_01|Mud_Dry_01)\.terrainlayer$",
+    ],
     # the cavalry's horses: Omabuarts' zebra, recoloured as a bay horse (Tools > Battle > Build Horse Coat). This pack
     # is already imported whole into Assets/Quirky Series here, so the job only matters for a fresh checkout.
     os.path.join(os.environ.get("APPDATA", ""), r"Unity\Asset Store-5.x\Omabuarts Studio\3D ModelsCharactersAnimals\Quirky Series - Animals Mega Pack Vol 1.unitypackage"): [
@@ -69,6 +85,8 @@ if len(sys.argv) > 1:
 GUID = re.compile(rb"guid: ([0-9a-f]{32})")
 
 def find_package(hint, root):
+    if os.path.isfile(hint):
+        return hint
     target = os.path.basename(hint).lower().replace("polygon - ", "").split()[0]
     for folder, _, files in os.walk(os.path.dirname(hint) if os.path.isdir(hint) is False else hint):
         for f in files:
@@ -106,7 +124,12 @@ for hint, roots in JOBS.items():
     paths = {g: e["pathname"].decode("utf-8").split("\n")[0].strip() for g, e in entries.items() if "pathname" in e}
     by_path = {p: g for g, p in paths.items()}
     todo = [by_path[r] for r in roots if r in by_path]
-    print("  roots found:", len(todo), "of", len(roots))
+    for r in roots:
+        if r.startswith("re:"):
+            matched = [g for p, g in by_path.items() if re.search(r[3:], p)]
+            print("  pattern", r[3:60], "matched", len(matched))
+            todo += matched
+    print("  roots found:", len(todo), "from", len(roots), "entries")
     wanted = set()
     while todo:
         guid = todo.pop()
@@ -115,7 +138,7 @@ for hint, roots in JOBS.items():
         wanted.add(guid)
         data = entries[guid]
         texts = [data.get("asset.meta", b"")]
-        if paths[guid].endswith((".prefab", ".mat")):
+        if paths[guid].endswith((".prefab", ".mat", ".terrainlayer", ".asset", ".shadergraph", ".shadersubgraph", ".controller")):
             texts.append(data.get("asset", b""))
         for text in texts:
             for found in GUID.findall(text):

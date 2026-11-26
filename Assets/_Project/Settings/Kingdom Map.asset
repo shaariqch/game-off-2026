@@ -1,0 +1,397 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e1b0afcd9e7f464da24576e750dbffb, type: 3}
+  m_Name: Kingdom Map
+  m_EditorClassIdentifier: Assembly-CSharp-Editor::KingdomMapBuilder
+  mapData: {fileID: 4900000, guid: e70f6e13e597bc04c8ed9fb3a3bdec79, type: 3}
+  outputFolder: Assets/_Project/Terrain/Kingdom
+  width: 256
+  tiles: 4
+  heightmapResolution: 513
+  alphamapResolution: 512
+  seaFloor: -14
+  terrainHeight: 115
+  height:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: -14
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 15
+      value: -6
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 19
+      value: -1.2
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 20
+      value: 0.8
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 22
+      value: 1.6
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 25
+      value: 2.6
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 35
+      value: 5
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 45
+      value: 9
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 55
+      value: 16
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 65
+      value: 27
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 80
+      value: 50
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 90
+      value: 66
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 100
+      value: 84
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  smoothing: 5
+  detail: 0.6
+  mountainDetail: 9
+  detailScale: 22
+  ridgeScale: 40
+  seed: 2026
+  water: {fileID: 2100000, guid: c608d9111776e6241a511d63fa84c10e, type: 2}
+  lakeDepth: 2.5
+  lakeBank: 2
+  riverMinCells: 25
+  riverWidth: {x: 2.5, y: 10}
+  riverWidthScale: 5
+  riverDepth: 1.4
+  riverBank: 4
+  grass: {fileID: 8574412962073106934, guid: e8a19b753c680d24c98f0aee4c3f6f1a, type: 2}
+  forestFloor: {fileID: 8574412962073106934, guid: 9f5c36e3546010746940a515bbf0494b, type: 2}
+  pineFloor: {fileID: 8574412962073106934, guid: 5d8b54541b4b81a4082bf55c46c9076a, type: 2}
+  swampGrass: {fileID: 8574412962073106934, guid: f618496f497c94c47a7203e653fbeb46, type: 2}
+  mud: {fileID: 8574412962073106934, guid: bdaa24a20cd038e4993440171e1de7cb, type: 2}
+  shore: {fileID: 8574412962073106934, guid: e652d2ba621bd9a4ab1d017689e56039, type: 2}
+  rock: {fileID: 8574412962073106934, guid: 682887672aa1ee04fa1c4287014cd8bb, type: 2}
+  snow: {fileID: 8574412962073106934, guid: 27eba1c658e77ee4db5474a920eb69fb, type: 2}
+  rockSlope: {x: 26, y: 40}
+  snowLineNorth: 20
+  snowLineRise: 140
+  snowBlend: 6
+  beachHeight: 0.9
+  beachWidth: 6
+  scatter:
+  - name: Broadleaf trees
+    prefabs:
+    - {fileID: 6954770494557141849, guid: 0f2120e89197acc47bfde23175d19f26, type: 3}
+    cover: 0
+    density: 1.1
+    spacing: 5
+    scale: {x: 0.5, y: 0.75}
+    maxSlope: 32
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  - name: Smaller broadleaf trees
+    prefabs:
+    - {fileID: 2146921750331591826, guid: a6dccea81e1455d4491d73f1d0e6d0ce, type: 3}
+    cover: 0
+    density: 0.9
+    spacing: 4
+    scale: {x: 0.8, y: 1.15}
+    maxSlope: 32
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  - name: Birches
+    prefabs:
+    - {fileID: 1016392496237815170, guid: f8b47c2401a09be4f87efe27b925b3fd, type: 3}
+    - {fileID: 5592075822852266847, guid: 44bbd64fad9366947a1c9b68c15e1261, type: 3}
+    - {fileID: 3298165907711742831, guid: 050fd5c9e63617c4db35ee70e9e823f1, type: 3}
+    cover: 0
+    density: 0.35
+    spacing: 4
+    scale: {x: 0.8, y: 1.1}
+    maxSlope: 32
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  - name: Woodland bushes
+    prefabs:
+    - {fileID: 5580235122429883281, guid: e527460148bf17741a2c17dffc4fb54a, type: 3}
+    - {fileID: 6906830690193866741, guid: 3595ba075729fec458abd9577f51845e, type: 3}
+    - {fileID: 1583897355313174661, guid: 09593cef97621c0418f070d7c9fa3091, type: 3}
+    cover: 0
+    density: 0.7
+    spacing: 3
+    scale: {x: 0.7, y: 1.1}
+    maxSlope: 35
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  - name: Pines
+    prefabs:
+    - {fileID: 4968422229000841456, guid: 99cae346a36c78b40b225eb44f72c393, type: 3}
+    - {fileID: 7456868699675954396, guid: 0585e61d38f41a04da13822d2106bd11, type: 3}
+    - {fileID: 2774792193389709639, guid: e676350d1b70df8488d2d9d6ceb5d6e7, type: 3}
+    - {fileID: 8521710535147519382, guid: ab205dd872b6fb04b8315914aca29cba, type: 3}
+    - {fileID: 7497724116738913923, guid: 0106d7f509c5eb24894fae58e3f3dfc1, type: 3}
+    cover: 1
+    density: 1.5
+    spacing: 4
+    scale: {x: 0.65, y: 1}
+    maxSlope: 40
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  - name: Dead pines
+    prefabs:
+    - {fileID: 7768758295742766608, guid: 183e64748acff7d4889d1836cb303ca5, type: 3}
+    cover: 1
+    density: 0.04
+    spacing: 8
+    scale: {x: 0.6, y: 0.9}
+    maxSlope: 40
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  - name: Mountain shrubs
+    prefabs:
+    - {fileID: 1820911450032466060, guid: 7c35a3f284a3b7e4289e64020f72746d, type: 3}
+    - {fileID: 5187082701057143323, guid: 970a686d9cdf76047a6cd6e6f71e8829, type: 3}
+    - {fileID: 7094374808237855621, guid: 451bedc003f10af4da30756902712e2f, type: 3}
+    cover: 1
+    density: 0.4
+    spacing: 3
+    scale: {x: 0.7, y: 1.1}
+    maxSlope: 40
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  - name: Lone trees
+    prefabs:
+    - {fileID: 6954770494557141849, guid: 0f2120e89197acc47bfde23175d19f26, type: 3}
+    - {fileID: 2146921750331591826, guid: a6dccea81e1455d4491d73f1d0e6d0ce, type: 3}
+    - {fileID: 1016392496237815170, guid: f8b47c2401a09be4f87efe27b925b3fd, type: 3}
+    cover: 3
+    density: 0.06
+    spacing: 10
+    scale: {x: 0.45, y: 0.7}
+    maxSlope: 25
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  - name: Field bushes
+    prefabs:
+    - {fileID: 5580235122429883281, guid: e527460148bf17741a2c17dffc4fb54a, type: 3}
+    - {fileID: 1583897355313174661, guid: 09593cef97621c0418f070d7c9fa3091, type: 3}
+    cover: 3
+    density: 0.12
+    spacing: 4
+    scale: {x: 0.7, y: 1.2}
+    maxSlope: 28
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  - name: Rocks
+    prefabs:
+    - {fileID: 4724106104165785308, guid: c984ce3ffcfcde34d869d4ee01082a68, type: 3}
+    - {fileID: 1497840489996059409, guid: d6317274878cf7b4b8bb314093c1426e, type: 3}
+    - {fileID: 4950106106543332184, guid: aa984382a7091c04cb983d99972fddd7, type: 3}
+    - {fileID: 7695937808761457463, guid: 2049902f334079b4583c2decec2dc81a, type: 3}
+    - {fileID: 811305085591723145, guid: 22e91f0b02ff8424b84427abd63753e9, type: 3}
+    - {fileID: 3175127709135130561, guid: aa258efdcf857e548a0e67bbf807043c, type: 3}
+    - {fileID: 7706068851314558504, guid: 486c6dd7b8657ca479d3063eef375a2a, type: 3}
+    - {fileID: 2236629855792467630, guid: 71fb29e5dc238694ea35a6b83afe27db, type: 3}
+    - {fileID: 3134720509254622281, guid: 02c6de2ee24bc484a9a181ec28cfc229, type: 3}
+    cover: 4
+    density: 0.45
+    spacing: 6
+    scale: {x: 0.6, y: 1.4}
+    maxSlope: 75
+    heightRange: {x: 3, y: 200}
+    inShallows: 0
+  - name: Crags
+    prefabs:
+    - {fileID: 6950009888802643401, guid: e076c5809d0d2484d860c5c3720ab016, type: 3}
+    - {fileID: 7272602017691614296, guid: 98b055022647a9c4f8c44c5af88113d0, type: 3}
+    - {fileID: 103171648435572364, guid: c62a208694a5e0a4cb922ed3626ca248, type: 3}
+    cover: 4
+    density: 0.06
+    spacing: 14
+    scale: {x: 0.7, y: 1.2}
+    maxSlope: 75
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  - name: Swamp trees
+    prefabs:
+    - {fileID: 2149084166913621911, guid: f2c879d6c4ef23f4781ee99ce3de37b2, type: 3}
+    - {fileID: 9210009852350807242, guid: 87d2c971e946d704595305208241bae9, type: 3}
+    - {fileID: 6718383148851874771, guid: 020fc85939da98446bc8518dc58fdd11, type: 3}
+    - {fileID: 8363043970106710187, guid: 7ead3dd38945dd94fa33046cedda5ce8, type: 3}
+    cover: 2
+    density: 0.22
+    spacing: 8
+    scale: {x: 0.35, y: 0.55}
+    maxSlope: 25
+    heightRange: {x: 0.25, y: 30}
+    inShallows: 0
+  - name: Mangroves
+    prefabs:
+    - {fileID: 4009130224601514683, guid: 3564ac9ba4a7053478213d99be8ba454, type: 3}
+    - {fileID: 1340762269283254766, guid: 28d2f32413dd09845bcd7f1908d8417a, type: 3}
+    - {fileID: 732480331940394705, guid: da6badacf9125174da9b600997adfe74, type: 3}
+    cover: 2
+    density: 0.3
+    spacing: 5
+    scale: {x: 0.6, y: 0.9}
+    maxSlope: 25
+    heightRange: {x: 0.25, y: 30}
+    inShallows: 0
+  - name: Dead swamp trees
+    prefabs:
+    - {fileID: 7461244841290866330, guid: d1f39c9008e91574eb627e706a1f0b99, type: 3}
+    - {fileID: 1626559230370695198, guid: 952f037367706f84896734276b8c060d, type: 3}
+    cover: 2
+    density: 0.05
+    spacing: 9
+    scale: {x: 0.6, y: 0.9}
+    maxSlope: 25
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  - name: Marsh grass
+    prefabs:
+    - {fileID: 35628539745627316, guid: 417865cbe241897458ac3062151304dc, type: 3}
+    - {fileID: 2853556814673621405, guid: 882fb4fd34f39fa42902b7416515c76d, type: 3}
+    - {fileID: 6532359867544712969, guid: d7828ab1712df0149a1729705c93365e, type: 3}
+    - {fileID: 8981097282521029215, guid: 4ad20c485adfc444ea12fbc707014862, type: 3}
+    - {fileID: 1580160987385122007, guid: 81f6a1632c5b445428187404a0edb518, type: 3}
+    - {fileID: 1193204060893072075, guid: 313a83fbf179e71488e4ab48685b2eb0, type: 3}
+    - {fileID: 794630703205772257, guid: aac9cbe8c5fd8bb47a0e301f19bf9fdf, type: 3}
+    cover: 2
+    density: 1.4
+    spacing: 2.5
+    scale: {x: 0.4, y: 0.65}
+    maxSlope: 25
+    heightRange: {x: 0.25, y: 30}
+    inShallows: 0
+  - name: Reeds
+    prefabs:
+    - {fileID: 5860169141729745233, guid: f47da7769bcb3e24eaa14df56a71cf01, type: 3}
+    - {fileID: 7129942183683350244, guid: d29e0f30c61717f469ec5cab7e74e527, type: 3}
+    cover: 5
+    density: 3.5
+    spacing: 1.4
+    scale: {x: 0.45, y: 0.7}
+    maxSlope: 30
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 1
+  - name: Orchards
+    prefabs:
+    - {fileID: 2452613710419899469, guid: f5ba9e2973c6d8d4cad295b79e2a7f45, type: 3}
+    - {fileID: 2154830210199987570, guid: 681cbb809427f574a9f0d40322b45c90, type: 3}
+    - {fileID: 739240639354438539, guid: ab41e12e3193e5241a054da74ad6cee7, type: 3}
+    cover: 6
+    density: 0.9
+    spacing: 5
+    scale: {x: 0.8, y: 1.1}
+    maxSlope: 20
+    heightRange: {x: 0.4, y: 200}
+    inShallows: 0
+  clearTowns:
+  - Stonewatch
+  - Millbrook
+  - Kingsford
+  - Yewdale
+  - Highfield
+  - Reedmere
+  - Kingsmere
+  - Harrowby
+  - Saltmouth
+  townClearing: 18
+  orchardTowns:
+  - Harrowby
+  - Millbrook
+  orchardRadius: 45
