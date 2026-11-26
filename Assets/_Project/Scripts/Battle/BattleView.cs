@@ -69,6 +69,10 @@ public class BattleView : MonoBehaviour
     [Tooltip("Seconds a dying figure takes to fall over, then how long it lies there before it's removed.")]
     [SerializeField, Min(0.01f)] float fallTime = 0.35f;
     [SerializeField, Min(0f)] float corpseTime = 4f;
+    [Tooltip("With a death clip: seconds into it that the body hits the ground and raises dust.")]
+    [SerializeField, Min(0.01f)] float deathLandTime = 0.9f;
+    [Tooltip("How quickly a figure's walk or run follows changes in its speed.")]
+    [SerializeField, Min(0.1f)] float speedSmoothing = 8f;
     [Tooltip("How hard a hit squashes the figure it lands on, through its scale spring. A charge squashes three times as hard.")]
     [SerializeField, Min(0f)] float hitSquash = 4f;
 
@@ -169,6 +173,10 @@ public class BattleView : MonoBehaviour
         /// <summary>The body. Lunges, squashes and falling over happen here, so they don't shake the camera.</summary>
         public Transform visual;
         public MMSpringScale spring;
+        /// <summary>Plays the figure's clips, or null for a unit type without animation.</summary>
+        public FigureAnimation animation;
+        /// <summary>Smoothed ground speed, which picks idle, walk or run.</summary>
+        public float speed;
         public bool placed;
         public float seenAttackTime = -1f;
         public bool seenDeath;
@@ -327,6 +335,7 @@ public class BattleView : MonoBehaviour
             Debug.LogError("BattleView needs both spawn points set.", this);
             return;
         }
+        DisposeAnimations();
         if (figureRoot != null)
             Destroy(figureRoot.gameObject);
         figureRoot = new GameObject("Figures").transform;
@@ -405,9 +414,21 @@ public class BattleView : MonoBehaviour
             body.transform.localPosition = Vector3.zero;
             body.transform.localRotation = Quaternion.identity;
             body.transform.localScale = Vector3.one * unit.type.visualScale;
-            // nothing animates the figures yet, so their Animators would only cost time
-            foreach (var animator in body.GetComponentsInChildren<Animator>())
-                animator.enabled = false;
+            var animators = body.GetComponentsInChildren<Animator>();
+            var type = unit.type;
+            if (type.Animated && animators.Length > 0)
+            {
+                // the sim moves the figure, so the clips play in place
+                animators[0].enabled = true;
+                animators[0].applyRootMotion = false;
+                animators[0].cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+                figure.animation = new FigureAnimation(animators[0], type.idleClip, type.walkClip, type.runClip,
+                    type.walkClipSpeed, type.runClipSpeed, Random.value);
+            }
+            else
+                // unanimated figures stay in their bind pose, and their Animators would only cost time
+                foreach (var animator in animators)
+                    animator.enabled = false;
             foreach (var collider in body.GetComponentsInChildren<Collider>())
                 collider.enabled = false;
             if (unit.type.weaponPrefab != null)
@@ -470,27 +491,34 @@ public class BattleView : MonoBehaviour
 
             if (!unit.Alive)
             {
+                bool dyingAnimated = figure.animation != null && unit.type.deathClips.Length > 0;
                 if (!figure.seenDeath)
                 {
                     figure.seenDeath = true;
                     Play(deathClip);
+                    if (dyingAnimated)
+                        figure.animation.Play(Pick(unit.type.deathClips), 0.1f, 0f, true);
                 }
+                figure.animation?.Update(Time.deltaTime, 0f);
                 float dead = sim.Time - unit.diedTime;
                 SetCameraWeight(figure.root, 1f - dead / cameraForgetTime);
                 if (dead > Mathf.Max(fallTime + corpseTime, cameraForgetTime))
                 {
+                    figure.animation?.Dispose();
+                    figure.animation = null;
                     Destroy(figure.root.gameObject);
                     figure.root = null;
                     continue;
                 }
-                float fall = Mathf.Clamp01(dead / fallTime);
+                float fall = Mathf.Clamp01(dead / (dyingAnimated ? deathLandTime : fallTime));
                 if (fall >= 1f && !figure.landed)
                 {
                     figure.landed = true;
                     Emit(dust, figure.root.position + figure.root.forward * -0.6f, dustColour, 6);
                 }
                 figure.visual.localPosition = Vector3.zero;
-                figure.visual.localRotation = Quaternion.Euler(-90f * fall * fall, 0f, 0f);
+                // without a death clip the figure just tips over
+                figure.visual.localRotation = dyingAnimated ? Quaternion.identity : Quaternion.Euler(-90f * fall * fall, 0f, 0f);
                 figure.visual.gameObject.SetActive(dead <= fallTime + corpseTime);
                 continue;
             }
@@ -500,17 +528,37 @@ public class BattleView : MonoBehaviour
                 figure.seenAttackTime = unit.lastAttackTime;
                 if (unit.lastAttackRanged)
                     Play(arrowShotClip);
+                if (figure.animation != null)
+                {
+                    var type = unit.type;
+                    // a blow fits inside the time until the next one
+                    var clip = unit.lastAttackRanged ? type.shootClip : Pick(type.attackClips);
+                    float interval = unit.lastAttackRanged ? type.rangedInterval : type.meleeInterval;
+                    if (clip != null)
+                        figure.animation.Play(clip, 0.08f, Mathf.Min(clip.length, interval * 0.95f));
+                }
             }
 
             float targetYaw = Mathf.Atan2(unit.facing.x, unit.facing.y) * Mathf.Rad2Deg;
             figure.yaw = Mathf.MoveTowardsAngle(figure.yaw, targetYaw, turnSpeed * Time.deltaTime);
             var position = new Vector3(unit.position.x, sim.HeightAt(unit.position), unit.position.y);
             var before = figure.root.localPosition;
+            bool wasPlaced = figure.placed;
             figure.root.localPosition = figure.placed
                 ? Vector3.Lerp(figure.root.localPosition, position, 1f - Mathf.Exp(-followSharpness * Time.deltaTime))
                 : position;
             figure.placed = true;
             figure.root.localRotation = Quaternion.Euler(0f, figure.yaw, 0f);
+
+            // idle, walk or run by how fast the figure is actually going
+            if (figure.animation != null && Time.deltaTime > 0f)
+            {
+                var moved = figure.root.localPosition - before;
+                moved.y = 0f;
+                float measured = wasPlaced ? moved.magnitude / Time.deltaTime : 0f;
+                figure.speed = Mathf.Lerp(figure.speed, measured, 1f - Mathf.Exp(-speedSmoothing * Time.deltaTime));
+                figure.animation.Update(Time.deltaTime, figure.speed);
+            }
 
             // riders kick up dust
             if (unit.type.IsCavalry && Time.deltaTime > 0f)
@@ -526,8 +574,9 @@ public class BattleView : MonoBehaviour
                 }
             }
 
+            // an unanimated figure jabs forward instead of swinging
             float lunge = 0f;
-            if (unit.lastAttackTime >= 0f && !unit.lastAttackRanged)
+            if (figure.animation == null && unit.lastAttackTime >= 0f && !unit.lastAttackRanged)
             {
                 float since = (sim.Time - unit.lastAttackTime) / lungeTime;
                 if (since < 1f)
@@ -554,6 +603,7 @@ public class BattleView : MonoBehaviour
                     Shake(chargeShake);
                     Play(chargeClip);
                     Squash(e.other, 3f);
+                    Flinch(e.other, true);
                     ShowNumber(e.other, e.damage, true);
                     Emit(dust, World(e.position, 0.2f), dustColour, 14);
                     Emit(hits, at, hitColour, 8);
@@ -572,11 +622,13 @@ public class BattleView : MonoBehaviour
                 case BattleSim.EventKind.Hit:
                     Play(meleeHitClip);
                     Squash(e.other, e.rear ? 1.6f : 1f);
+                    Flinch(e.other, false);
                     ShowNumber(e.other, e.damage, e.rear);
                     Emit(hits, at, hitColour, e.rear ? 6 : 3);
                     break;
                 case BattleSim.EventKind.ArrowHit:
                     Squash(e.other, 0.6f);
+                    Flinch(e.other, false);
                     ShowNumber(e.other, e.damage, false);
                     Emit(hits, at, hitColour, 2);
                     break;
@@ -597,6 +649,33 @@ public class BattleView : MonoBehaviour
     }
 
     Vector3 World(Vector2 point, float lift) => transform.TransformPoint(new Vector3(point.x, sim.HeightAt(point) + lift, point.y));
+
+    /// <summary>Plays a hit reaction, unless the figure is busy with another action; a charge's knockback always plays.</summary>
+    void Flinch(BattleSim.Unit unit, bool knockback)
+    {
+        if (unit == null || !unit.Alive || unit.id >= figures.Count)
+            return;
+        var animation = figures[unit.id].animation;
+        if (animation == null || (!knockback && animation.Action != null))
+            return;
+        var clips = knockback && unit.type.knockbackClips.Length > 0 ? unit.type.knockbackClips : unit.type.hitClips;
+        var clip = Pick(clips);
+        if (clip != null)
+            animation.Play(clip, 0.05f, knockback ? Mathf.Min(clip.length, simSettings.chargeStagger + 0.3f) : 0f);
+    }
+
+    static AnimationClip Pick(AnimationClip[] clips) => clips != null && clips.Length > 0 ? clips[Random.Range(0, clips.Length)] : null;
+
+    void DisposeAnimations()
+    {
+        foreach (var figure in figures)
+        {
+            figure.animation?.Dispose();
+            figure.animation = null;
+        }
+    }
+
+    void OnDestroy() => DisposeAnimations();
 
     void Squash(BattleSim.Unit unit, float strength)
     {

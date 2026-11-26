@@ -227512,6 +227512,8 @@ MonoBehaviour:
   lungeTime: 0.25
   fallTime: 0.35
   corpseTime: 4
+  deathLandTime: 0.9
+  speedSmoothing: 8
   hitSquash: 4
   arrowMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
   arrowMaterial: {fileID: 2100000, guid: d14f9ebc3ee57724baea640e92bfb822, type: 2}

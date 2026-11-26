@@ -37,3 +37,18 @@ MonoBehaviour:
   visualPrefab: {fileID: 1074668445682794, guid: 128d74125a472834991824f3f72198b5, type: 3}
   weaponPrefab: {fileID: 0}
   visualScale: 1
+  idleClip: {fileID: 3215575822887921774, guid: ed8560f44bf9d4b48b00a743e934cf99, type: 3}
+  walkClip: {fileID: 6048701035611563356, guid: 6f2f17a5242e38648b83ee303844b46c, type: 3}
+  runClip: {fileID: 4763494864668633848, guid: 4dcfcd030150f2e408b985ae4c109387, type: 3}
+  walkClipSpeed: 1.4
+  runClipSpeed: 3.8
+  attackClips:
+  - {fileID: 6976764880961377414, guid: 2bc84587487ff2e449187e4dd254b9ca, type: 3}
+  - {fileID: -4126027623530713511, guid: 2aa8955f01ff41d4ab3a673b9d8bc151, type: 3}
+  shootClip: {fileID: 1827226128182048838, guid: 70ecfbfbbbb4aee4797ded1679966c6d, type: 3}
+  hitClips:
+  - {fileID: 1827226128182048838, guid: b4bb330a0f98de947937f4ba0be58a5c, type: 3}
+  knockbackClips:
+  - {fileID: 1827226128182048838, guid: 496548554d4f86e4298aa6d11a7b6f51, type: 3}
+  deathClips:
+  - {fileID: 1827226128182048838, guid: fafd8a2b94542b345ae3f0a90c5df9e2, type: 3}

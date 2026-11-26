@@ -72,6 +72,25 @@ public class UnitType : ScriptableObject
     public GameObject weaponPrefab;
     [Min(0.1f)] public float visualScale = 1f;
 
+    [Header("Animation (humanoid clips; empty leaves the figure still)")]
+    public AnimationClip idleClip;
+    public AnimationClip walkClip;
+    public AnimationClip runClip;
+    [Tooltip("Metres a second the walk and run clips were made for. Their playback speeds up or slows to match how fast the figure moves.")]
+    [Min(0.1f)] public float walkClipSpeed = 1.4f;
+    [Min(0.1f)] public float runClipSpeed = 3.8f;
+    [Tooltip("Melee blows; one is picked at random for each.")]
+    public AnimationClip[] attackClips = new AnimationClip[0];
+    [Tooltip("A shot, for ranged units.")]
+    public AnimationClip shootClip;
+    [Tooltip("Flinches when hit; one at random.")]
+    public AnimationClip[] hitClips = new AnimationClip[0];
+    [Tooltip("Played when knocked back by a charge.")]
+    public AnimationClip[] knockbackClips = new AnimationClip[0];
+    public AnimationClip[] deathClips = new AnimationClip[0];
+
+    public bool Animated => idleClip != null;
+
     public bool IsRanged => rangedDamage > 0f;
     public bool IsCavalry => role == Role.Cavalry;
 

@@ -70,6 +70,9 @@ The code is here to be read; the playable game is the build on itch.io.
 | Pack | Author | Used for | Licence | In this repository |
 |---|---|---|---|---|
 | POLYGON - Fantasy Kingdom Pack | Synty Studios | Soldiers, weapons, banners and field props | Synty Store licence | No |
+| ANIMATION - Base Locomotion | Synty Studios | Soldiers' idle, walk and run | Synty Store licence | No |
+| FS - Melee Combat System | Fantacode Studios | Sword attack and hit reaction animations (clips only) | Unity Asset Store EULA | No |
+| Stylish Archer Assets Pack | Grruzam | Bow shot, hit reaction and death animations (clips only) | Unity Asset Store EULA | No |
 
 <!-- One row per pack: name, author, what it's used for, licence, "not in this repository". -->
 
