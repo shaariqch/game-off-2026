@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DamageNumbersPro;
 using MoreMountains.Feedbacks;
 using Unity.Cinemachine;
 using UnityEngine;
@@ -88,6 +89,27 @@ public class BattleView : MonoBehaviour
     [Tooltip("Dust puffs a second kicked up by riding cavalry.")]
     [SerializeField, Min(0f)] float cavalryDust = 14f;
 
+    [Header("Damage numbers (Damage Numbers Pro)")]
+    [Tooltip("A 3D preset popped over a unit for every melee hit and arrow. The view spawns from its own hidden copy, set up with the values below, so the preset itself is never changed.")]
+    [SerializeField] DamageNumber hitNumber;
+    [Tooltip("The preset for charges and hits from behind.")]
+    [SerializeField] DamageNumber heavyNumber;
+    [Tooltip("Metres above a unit's feet a number starts.")]
+    [SerializeField] float numberHeight = 2.2f;
+    [Tooltip("Numbers keep the size they'd have at this camera distance, however far the camera is, times Number Scale.")]
+    [SerializeField, Min(1f)] float numberBaseDistance = 15f;
+    [SerializeField, Min(0.01f)] float numberScale = 0.7f;
+    [SerializeField, Min(0.01f)] float heavyNumberScale = 1.5f;
+    [Tooltip("Neutral colours, so a number never reads as one side's.")]
+    [SerializeField] Color hitNumberColour = new Color(1f, 0.95f, 0.86f);
+    [SerializeField] Color heavyNumberColour = new Color(1f, 0.72f, 0.2f);
+    [Tooltip("Seconds a number stays up; 0 keeps the preset's own.")]
+    [SerializeField, Min(0f)] float numberLifetime = 1f;
+    [Tooltip("Most numbers of each kind on screen at once; each costs a few draw calls.")]
+    [SerializeField, Min(1)] int maxNumbers = 16;
+    [Tooltip("Seconds between a number's animation steps. Each step rebuilds its mesh, which is most of their cost.")]
+    [SerializeField, Min(0f)] float numberUpdateDelay = 0.03f;
+
     [Header("Feel")]
     [Tooltip("Camera shake frequency, then its size (Cinemachine noise amplitude) and length in seconds for each kind of moment.")]
     [SerializeField] float shakeFrequency = 22f;
@@ -151,6 +173,7 @@ public class BattleView : MonoBehaviour
     float stepDebt;
     bool reported;
     ParticleSystem dust, hits;
+    DamageNumber hitTemplate, heavyTemplate;
     MMChannelData channel;
     Transform focus;
     float focusWeight, focusUntil, nextMomentAt;
@@ -170,6 +193,63 @@ public class BattleView : MonoBehaviour
         hits = MakeParticles("Hits", new Vector2(0.3f, 0.6f), new Vector2(2f, 5f), new Vector2(0.18f, 0.35f), 1.2f);
         focus = new GameObject("Moment Focus").transform;
         focus.SetParent(transform, false);
+        // hidden copies of the presets to spawn from; under an inactive parent they never run themselves
+        var templates = new GameObject("Damage Number Templates");
+        templates.SetActive(false);
+        templates.transform.SetParent(transform, false);
+        hitTemplate = MakeNumberTemplate(hitNumber, templates.transform, numberScale);
+        heavyTemplate = MakeNumberTemplate(heavyNumber != null ? heavyNumber : hitNumber, templates.transform, numberScale * heavyNumberScale);
+    }
+
+    DamageNumber MakeNumberTemplate(DamageNumber preset, Transform parent, float scale)
+    {
+        if (preset == null)
+            return null;
+        var template = Instantiate(preset, parent);
+        template.name = preset.name + " (battle)";
+        template.transform.localScale = preset.transform.localScale * scale;
+        // the camera sits 30 to 60 m away and zooms in for moments, so keep numbers one size on screen
+        // (its size is distance / base distance times a factor running from close scale to far scale; 1 and 1 keeps it plain)
+        template.consistentScreenSize = true;
+        template.distanceScalingSettings.baseDistance = numberBaseDistance;
+        template.distanceScalingSettings.closeDistance = 0f;
+        template.distanceScalingSettings.farDistance = 1000f;
+        template.distanceScalingSettings.closeScale = 1f;
+        template.distanceScalingSettings.farScale = 1f;
+        if (numberLifetime > 0f)
+            template.lifetime = numberLifetime;
+        // slow motion slows them too
+        template.unscaledTime = false;
+        template.enablePooling = true;
+        template.poolSize = maxNumbers;
+        // the oldest fade out early when a big melee would put more than this on screen
+        template.limitActiveInstances = true;
+        template.maxActiveInstances = maxNumbers;
+        template.enableCombination = false;
+        // every number rebuilds its mesh this often; the preset's 0.0125 s cost about 7 ms a frame for 35 numbers
+        template.updateDelay = numberUpdateDelay;
+        // the preset's own colour gradient would override the colours set per number
+        foreach (var text in template.GetComponentsInChildren<TMPro.TMP_Text>(true))
+            text.enableVertexGradient = false;
+        // numbers casting shadows added a shadow pass draw for every one of them
+        foreach (var renderer in template.GetComponentsInChildren<Renderer>(true))
+        {
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+        return template;
+    }
+
+    void ShowNumber(BattleSim.Unit unit, float damage, bool heavy)
+    {
+        var template = heavy ? heavyTemplate : hitTemplate;
+        if (template == null || unit == null || unit.id >= figures.Count)
+            return;
+        var figure = figures[unit.id];
+        if (figure.root == null)
+            return;
+        var number = template.Spawn(figure.root.position + Vector3.up * numberHeight, Mathf.Max(1, Mathf.RoundToInt(damage)), figure.root);
+        number.SetColor(heavy ? heavyNumberColour : hitNumberColour);
     }
 
     void Start()
@@ -444,6 +524,7 @@ public class BattleView : MonoBehaviour
                     Shake(chargeShake);
                     Play(chargeClip);
                     Squash(e.other, 3f);
+                    ShowNumber(e.other, e.damage, true);
                     Emit(dust, World(e.position, 0.2f), dustColour, 14);
                     Emit(hits, at, hitColour, 8);
                     // the freeze goes on top of any slow motion, so it comes second
@@ -455,15 +536,18 @@ public class BattleView : MonoBehaviour
                     Shake(bracedShake);
                     Play(meleeHitClip);
                     Squash(e.unit, 2f);
+                    ShowNumber(e.other, e.damage, false);
                     Emit(hits, at, sparkColour, 10);
                     break;
                 case BattleSim.EventKind.Hit:
                     Play(meleeHitClip);
                     Squash(e.other, e.rear ? 1.6f : 1f);
+                    ShowNumber(e.other, e.damage, e.rear);
                     Emit(hits, at, hitColour, e.rear ? 6 : 3);
                     break;
                 case BattleSim.EventKind.ArrowHit:
                     Squash(e.other, 0.6f);
+                    ShowNumber(e.other, e.damage, false);
                     Emit(hits, at, hitColour, 2);
                     break;
                 case BattleSim.EventKind.ArrowMiss:

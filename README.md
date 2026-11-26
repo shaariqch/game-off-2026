@@ -47,6 +47,10 @@ Editor tools and code libraries (needed to compile if the game's code uses them)
 | Flat Kit: Toon Shading and Water | Dustyroom | `Assets/FlatKit` |
 | Linework: Outlines and Edge Detection | Alexander Ameye | `Packages/dev.ameye.linework` |
 | Feel | More Mountains | `Assets/Feel` (the demo folders aren't needed) |
+| Damage Numbers Pro | Ekincan Tas | `Assets/DamageNumbersPro` (its `Demo/Prefabs` are used) |
+
+Damage Numbers Pro also needs TextMeshPro's essential resources (`Window > TextMeshPro > Import TMP Essential
+Resources`), which aren't in the repository either.
 
 Art, audio and other content packs used by the game will be listed under "Third-party assets" below as they are
 added.
