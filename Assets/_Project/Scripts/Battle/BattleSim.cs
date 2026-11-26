@@ -61,13 +61,6 @@ public sealed class BattleSim
             float x = (point.x - centre.x) / radii.x, y = (point.y - centre.y) / radii.y;
             return Mathf.Sqrt(x * x + y * y);
         }
-
-        /// <summary>Ground height at a point: a dome that reaches the terrain's height in the middle.</summary>
-        public float Height(Vector2 point)
-        {
-            float distance = Distance(point);
-            return distance >= 1f ? 0f : terrain.height * Mathf.Sqrt(1f - distance * distance);
-        }
     }
 
     [Serializable]
@@ -80,7 +73,27 @@ public sealed class BattleSim
         [Tooltip("An army holding its ground goes for the enemy once any of them comes this close to one of its units. It also stops holding once one of its units has been shot.")]
         public float holdEngageDistance;
 
-        public static Settings Default => new Settings { retargetInterval = 0.5f, maxDuration = 180f, holdEngageDistance = 4f };
+
+        [Header("High ground (per metre a unit stands above its target, negative below)")]
+        [Tooltip("Added to a shooter's range, as a share of it, per metre of height over its target.")]
+        public float heightRange;
+        [Tooltip("Added to a shot's damage, as a share of it, per metre of height over its target.")]
+        public float heightShotDamage;
+        [Tooltip("Added to a melee hit's damage, as a share of it, per metre of height over its target.")]
+        public float heightMeleeDamage;
+        [Tooltip("Height differences count up to this many metres.")]
+        public float heightLimit;
+        [Tooltip("How much climbing slows a unit: speed is divided by 1 + this times the slope (rise over run).")]
+        public float uphillSlowdown;
+        [Tooltip("Climbing a slope steeper than this (rise over run) loses a charge.")]
+        public float chargeMaxSlope;
+
+        public static Settings Default => new Settings
+        {
+            retargetInterval = 0.5f, maxDuration = 180f, holdEngageDistance = 4f,
+            heightRange = 0.06f, heightShotDamage = 0.08f, heightMeleeDamage = 0.05f, heightLimit = 5f,
+            uphillSlowdown = 2f, chargeMaxSlope = 0.12f,
+        };
     }
 
     public readonly List<Unit> units = new List<Unit>();
@@ -94,6 +107,7 @@ public sealed class BattleSim
     readonly Rect bounds;
     readonly System.Random random;
     readonly List<Zone> zones = new List<Zone>();
+    readonly Func<Vector2, float> heightAt;
     // a side that holds stands its ground until the enemy gets close or shoots it; then the whole side goes together
     readonly bool[] holding = new bool[2];
 
@@ -101,12 +115,14 @@ public sealed class BattleSim
     public bool IsHolding(int side) => holding[side];
 
     /// <param name="zones">Terrain on the field, or null for open ground everywhere.</param>
+    /// <param name="heightAt">Ground height at a point of the field, or null for flat ground.</param>
     /// <param name="holdA">Army A stands its ground instead of advancing.</param>
     /// <param name="holdB">Army B stands its ground instead of advancing.</param>
     public BattleSim(IList<ArmyEntry> armyA, IList<ArmyEntry> armyB, Rect zoneA, Rect zoneB, Rect bounds, int seed, Settings settings,
-        IList<Zone> zones = null, bool holdA = false, bool holdB = false)
+        IList<Zone> zones = null, bool holdA = false, bool holdB = false, Func<Vector2, float> heightAt = null)
     {
         this.settings = settings;
+        this.heightAt = heightAt;
         this.bounds = bounds;
         random = new System.Random(seed);
         if (zones != null)
@@ -169,14 +185,8 @@ public sealed class BattleSim
         return null;
     }
 
-    /// <summary>Ground height at a point, for the view.</summary>
-    public float HeightAt(Vector2 point)
-    {
-        float height = 0f;
-        for (int i = 0; i < zones.Count; i++)
-            height = Mathf.Max(height, zones[i].Height(point));
-        return height;
-    }
+    /// <summary>Ground height at a point of the field.</summary>
+    public float HeightAt(Vector2 point) => heightAt != null ? heightAt(point) : 0f;
 
     public void Tick()
     {
@@ -267,12 +277,15 @@ public sealed class BattleSim
         float gap = distance - type.radius - target.type.radius;
         var ground = TerrainAt(unit.position);
         var targetGround = TerrainAt(target.position);
+        float height = HeightAt(unit.position);
+        // how far above its target the unit stands; high ground helps, low ground hurts
+        float above = Mathf.Clamp(height - HeightAt(target.position), -settings.heightLimit, settings.heightLimit);
 
         bool shooting = type.IsRanged && gap > type.tooCloseToShoot;
         float reach = type.meleeReach;
         if (shooting)
         {
-            reach = type.range * (ground != null ? ground.shooterRange : 1f);
+            reach = type.range * (ground != null ? ground.shooterRange : 1f) * Mathf.Max(0.3f, 1f + settings.heightRange * above);
             if (targetGround != null && targetGround.hiddenBeyond > 0f)
                 reach = Mathf.Min(reach, targetGround.hiddenBeyond);
         }
@@ -288,6 +301,13 @@ public sealed class BattleSim
                 holding[unit.side] = false;
             }
             float speed = type.speed * (ground != null ? ground.SpeedFor(type) : 1f);
+            float slope = (HeightAt(unit.position + direction * 0.5f) - height) / 0.5f;
+            if (slope > 0f)
+            {
+                speed /= 1f + settings.uphillSlowdown * slope;
+                if (slope > settings.chargeMaxSlope)
+                    unit.movedSinceAttack = 0f;
+            }
             float move = Mathf.Min(speed * Step, gap - reach + 0.01f);
             unit.position += direction * move;
             unit.movedSinceAttack += move;
@@ -310,7 +330,7 @@ public sealed class BattleSim
             {
                 from = unit, target = target, start = unit.position, end = end,
                 duration = Mathf.Max(0.05f, distance / type.projectileSpeed), hits = hits,
-                damage = damage * type.rangedDamage * (ground != null ? ground.shooterDamage : 1f),
+                damage = damage * type.rangedDamage * Mathf.Max(0.3f, 1f + settings.heightShotDamage * above),
             });
         }
         else
@@ -320,8 +340,7 @@ public sealed class BattleSim
             bool chargeGround = (ground == null || ground.allowsCharge) && (targetGround == null || targetGround.allowsCharge);
             if (chargeGround && type.chargeMultiplier > 1f && unit.movedSinceAttack >= type.chargeDistance)
                 damage *= type.chargeMultiplier;
-            if (targetGround != null && targetGround != ground)
-                damage *= targetGround.meleeDamageFromOutside;
+            damage *= Mathf.Max(0.3f, 1f + settings.heightMeleeDamage * above);
             target.pendingDamage += damage;
         }
         unit.movedSinceAttack = 0f;
@@ -433,9 +452,9 @@ public sealed class BattleSim
 
     /// <summary>Plays a whole battle with no graphics and returns it finished.</summary>
     public static BattleSim RunToEnd(IList<ArmyEntry> armyA, IList<ArmyEntry> armyB, Rect zoneA, Rect zoneB, Rect bounds, int seed, Settings settings,
-        IList<Zone> zones = null, bool holdA = false, bool holdB = false)
+        IList<Zone> zones = null, bool holdA = false, bool holdB = false, Func<Vector2, float> heightAt = null)
     {
-        var sim = new BattleSim(armyA, armyB, zoneA, zoneB, bounds, seed, settings, zones, holdA, holdB);
+        var sim = new BattleSim(armyA, armyB, zoneA, zoneB, bounds, seed, settings, zones, holdA, holdB, heightAt);
         while (sim.Winner == Running)
             sim.Tick();
         return sim;

@@ -29,6 +29,8 @@ public class BattleView : MonoBehaviour
     [SerializeField] BattleSim.Settings simSettings = BattleSim.Settings.Default;
     [Tooltip("Active Terrain Zones under this object are part of the battlefield. Empty means the whole scene is searched.")]
     [SerializeField] Transform terrainRoot;
+    [Tooltip("The land the battle is fought on. Units stand on its surface, and its slopes and heights count in the fight. Empty: the first active Terrain under Terrain Root, or flat ground.")]
+    [SerializeField] Terrain ground;
 
     [Header("Playback")]
     [Tooltip("Battle seconds per real second.")]
@@ -40,17 +42,21 @@ public class BattleView : MonoBehaviour
     [SerializeField] CinemachineTargetGroup cameraGroup;
     [Tooltip("Room the camera leaves around each unit.")]
     [SerializeField, Min(0f)] float cameraUnitRadius = 1.5f;
+    [Tooltip("Seconds over which a dead unit stops counting for the camera, so the view drifts instead of jumping.")]
+    [SerializeField, Min(0.01f)] float cameraForgetTime = 2.5f;
 
     [Header("Figures")]
     [Tooltip("Flat disc under each unit, coloured by side.")]
     [SerializeField] Mesh markerMesh;
     [SerializeField] Material markerMaterialA;
     [SerializeField] Material markerMaterialB;
-    [SerializeField, Min(0f)] float markerHeight = 0.03f;
+    [SerializeField, Min(0f)] float markerHeight = 0.08f;
     [Tooltip("Name of the bone a weapon is parented to.")]
     [SerializeField] string weaponBone = "Hand_R";
     [SerializeField] Vector3 weaponPosition;
     [SerializeField] Vector3 weaponRotation;
+    [Tooltip("How quickly a figure catches up with its unit's position. The battle moves in small steps; this smooths them out.")]
+    [SerializeField, Min(1f)] float followSharpness = 18f;
     [Tooltip("Degrees per second a figure turns towards where its unit faces.")]
     [SerializeField, Min(1f)] float turnSpeed = 540f;
     [Tooltip("How far a figure jabs forward when it lands a melee hit, and for how long.")]
@@ -81,7 +87,11 @@ public class BattleView : MonoBehaviour
 
     sealed class Figure
     {
+        /// <summary>Follows the unit smoothly; the camera watches this.</summary>
         public Transform root;
+        /// <summary>Body and marker. Lunges and falling over happen here, so they don't shake the camera.</summary>
+        public Transform visual;
+        public bool placed;
         public float seenAttackTime = -1f;
         public bool seenDeath;
         public float yaw;
@@ -151,16 +161,23 @@ public class BattleView : MonoBehaviour
 
         int battleSeed = seed != 0 ? seed : Random.Range(1, int.MaxValue);
         var zones = TerrainZones();
-        sim = new BattleSim(armyA, armyB, Zone(spawnA), Zone(spawnB), FieldBounds(), battleSeed, simSettings, zones, armyAHolds, armyBHolds);
+        var land = ground != null && ground.isActiveAndEnabled ? ground
+            : terrainRoot != null ? terrainRoot.GetComponentInChildren<Terrain>(false) : null;
+        System.Func<Vector2, float> heightAt = null;
+        if (land != null)
+            heightAt = point => land.SampleHeight(transform.TransformPoint(new Vector3(point.x, 0f, point.y))) + land.transform.position.y - transform.position.y;
+        sim = new BattleSim(armyA, armyB, Zone(spawnA), Zone(spawnB), FieldBounds(), battleSeed, simSettings, zones, armyAHolds, armyBHolds, heightAt);
         Debug.Log("[Battle] started with seed " + battleSeed + ", " + sim.units.Count + " units, " + zones.Count + " terrain zones");
         foreach (var unit in sim.units)
         {
             var figure = MakeFigure(unit);
             figures.Add(figure);
-            if (cameraGroup != null)
-                cameraGroup.AddMember(figure.root, 1f, cameraUnitRadius);
         }
         ShowUnits();
+        // added once the figures are in place, so the camera doesn't start from a pile at the origin
+        if (cameraGroup != null)
+            foreach (var figure in figures)
+                cameraGroup.AddMember(figure.root, 1f, cameraUnitRadius);
     }
 
     Rect Zone(Transform centre)
@@ -191,11 +208,13 @@ public class BattleView : MonoBehaviour
     {
         var root = new GameObject(unit.type.name + " " + unit.id).transform;
         root.SetParent(figureRoot, false);
-        var figure = new Figure { root = root, yaw = Mathf.Atan2(unit.facing.x, unit.facing.y) * Mathf.Rad2Deg };
+        var visual = new GameObject("Visual").transform;
+        visual.SetParent(root, false);
+        var figure = new Figure { root = root, visual = visual, yaw = Mathf.Atan2(unit.facing.x, unit.facing.y) * Mathf.Rad2Deg };
 
         if (unit.type.visualPrefab != null)
         {
-            var body = Instantiate(unit.type.visualPrefab, root);
+            var body = Instantiate(unit.type.visualPrefab, visual);
             body.transform.localPosition = Vector3.zero;
             body.transform.localRotation = Quaternion.identity;
             body.transform.localScale = Vector3.one * unit.type.visualScale;
@@ -222,7 +241,7 @@ public class BattleView : MonoBehaviour
         if (markerMesh != null && markerMaterial != null)
         {
             var marker = new GameObject("Side Marker");
-            marker.transform.SetParent(root, false);
+            marker.transform.SetParent(visual, false);
             marker.transform.localPosition = new Vector3(0f, markerHeight, 0f);
             // sized from the mesh's own bounds, so any flat disc mesh works
             float width = unit.type.radius * 2.4f / Mathf.Max(0.001f, markerMesh.bounds.size.x);
@@ -263,18 +282,19 @@ public class BattleView : MonoBehaviour
                 {
                     figure.seenDeath = true;
                     Play(deathClip);
-                    if (cameraGroup != null)
-                        cameraGroup.RemoveMember(figure.root);
                 }
                 float dead = sim.Time - unit.diedTime;
-                if (dead > fallTime + corpseTime)
+                SetCameraWeight(figure, 1f - dead / cameraForgetTime);
+                if (dead > Mathf.Max(fallTime + corpseTime, cameraForgetTime))
                 {
                     Destroy(figure.root.gameObject);
                     figure.root = null;
                     continue;
                 }
                 float fall = Mathf.Clamp01(dead / fallTime);
-                figure.root.localRotation = Quaternion.Euler(0f, figure.yaw, 0f) * Quaternion.Euler(-90f * fall * fall, 0f, 0f);
+                figure.visual.localPosition = Vector3.zero;
+                figure.visual.localRotation = Quaternion.Euler(-90f * fall * fall, 0f, 0f);
+                figure.visual.gameObject.SetActive(dead <= fallTime + corpseTime);
                 continue;
             }
 
@@ -287,15 +307,38 @@ public class BattleView : MonoBehaviour
             float targetYaw = Mathf.Atan2(unit.facing.x, unit.facing.y) * Mathf.Rad2Deg;
             figure.yaw = Mathf.MoveTowardsAngle(figure.yaw, targetYaw, turnSpeed * Time.deltaTime);
             var position = new Vector3(unit.position.x, sim.HeightAt(unit.position), unit.position.y);
+            figure.root.localPosition = figure.placed
+                ? Vector3.Lerp(figure.root.localPosition, position, 1f - Mathf.Exp(-followSharpness * Time.deltaTime))
+                : position;
+            figure.placed = true;
+            figure.root.localRotation = Quaternion.Euler(0f, figure.yaw, 0f);
+
+            float lunge = 0f;
             if (unit.lastAttackTime >= 0f && !unit.lastAttackRanged)
             {
                 float since = (sim.Time - unit.lastAttackTime) / lungeTime;
                 if (since < 1f)
-                    position += new Vector3(unit.facing.x, 0f, unit.facing.y) * (Mathf.Sin(since * Mathf.PI) * lungeDistance);
+                    lunge = Mathf.Sin(since * Mathf.PI) * lungeDistance;
             }
-            figure.root.localPosition = position;
-            figure.root.localRotation = Quaternion.Euler(0f, figure.yaw, 0f);
+            figure.visual.localPosition = new Vector3(0f, 0f, lunge);
         }
+    }
+
+    void SetCameraWeight(Figure figure, float weight)
+    {
+        if (cameraGroup == null)
+            return;
+        int index = cameraGroup.FindMember(figure.root);
+        if (index < 0)
+            return;
+        if (weight <= 0f)
+        {
+            cameraGroup.Targets.RemoveAt(index);
+            return;
+        }
+        var member = cameraGroup.Targets[index];
+        member.Weight = weight;
+        cameraGroup.Targets[index] = member;
     }
 
     void ShowArrows()
