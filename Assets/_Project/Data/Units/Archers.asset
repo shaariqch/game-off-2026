@@ -17,7 +17,7 @@ MonoBehaviour:
   rank: 0
   bracesCharge: 0
   health: 30
-  speed: 2.8
+  speed: 4.4
   radius: 0.4
   meleeDamage: 1.5
   meleeInterval: 1

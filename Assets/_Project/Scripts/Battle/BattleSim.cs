@@ -209,7 +209,7 @@ public sealed class BattleSim
         {
             retargetInterval = 0.5f, maxDuration = 180f, holdEngageDistance = 4f,
             fileSpacing = 1.6f, rankSpacing = 1.6f, maxFrontage = 8, rangedGap = 2.5f, wingGap = 3f,
-            marchSpeed = 0.85f, maxSlotLag = 1.2f, engageDistance = 3f, generalMeleeAfter = 7f,
+            marchSpeed = 0.9f, maxSlotLag = 1.2f, engageDistance = 3f, generalMeleeAfter = 7f,
             cavalryEngageDistance = 6f, cavalryWait = 9f, flankMargin = 3f, flankDepth = 4f,
             cavalryMeleeTime = 2.5f, wheelDistance = 9f,
             chargeKnockback = 1.6f, chargeStagger = 0.7f, chargeSplashRadius = 1.6f, braceStagger = 0.8f,
@@ -242,6 +242,25 @@ public sealed class BattleSim
 
     /// <summary>True while a side is still standing its ground.</summary>
     public bool IsHolding(int side) => formations[side].holding;
+
+    /// <summary>
+    /// Metres a charging rider has left to ride before its blow lands, if that blow will land as a charge (enough
+    /// run-up, ground that allows it); -1 otherwise. The view uses it to slow time just before the impact.
+    /// </summary>
+    public float ChargeDistanceLeft(Unit unit)
+    {
+        var target = unit.target;
+        if (!unit.Alive || unit.cavalry != CavalryState.Charging || target == null || !target.Alive || unit.type.chargeMultiplier <= 1f)
+            return -1f;
+        float left = Mathf.Max(0f, Gap(unit, target) - unit.type.meleeReach);
+        if (unit.movedSinceAttack + left < unit.type.chargeDistance)
+            return -1f;
+        var ground = TerrainAt(unit.position);
+        var targetGround = TerrainAt(target.position);
+        if ((ground != null && !ground.allowsCharge) || (targetGround != null && !targetGround.allowsCharge))
+            return -1f;
+        return left;
+    }
 
     /// <param name="zoneA">Army A's formation is centred on this area's centre.</param>
     /// <param name="zones">Terrain on the field, or null for open ground everywhere.</param>

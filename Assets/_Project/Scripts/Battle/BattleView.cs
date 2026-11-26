@@ -8,9 +8,9 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Runs a <see cref="BattleSim"/> in the scene: spawns a figure for every unit, moves them as the battle plays,
 /// flies the arrows and logs the result. Enter starts another battle with the same armies.
-/// The feel comes from More Mountains' Feel, driven from code: camera shake on the Cinemachine camera
-/// (an MMCinemachineCameraShaker), freeze frames and slow motion (MMTimeManager), a lens zoom for big moments
-/// (MMCinemachineZoom) and a scale spring on every figure that squashes when it's hit.
+/// The feel: Feel (More Mountains), driven from code, for slow motion and freeze frames (MMTimeManager) and a scale
+/// spring on every figure that squashes when it's hit; Cinemachine impulses for the camera's jolts, which push along
+/// the blow; and a closer Cinemachine camera that the view cuts to for big moments.
 /// </summary>
 public class BattleView : MonoBehaviour
 {
@@ -125,31 +125,33 @@ public class BattleView : MonoBehaviour
     [SerializeField, Min(1f)] float numberGrowth = 1.6f;
     [SerializeField, Min(2f)] float numberGrowUntil = 60f;
 
-    [Header("Feel")]
-    [Tooltip("Camera shake frequency, then its size (Cinemachine noise amplitude) and length in seconds for each kind of moment.")]
-    [SerializeField] float shakeFrequency = 22f;
-    [SerializeField] Vector2 contactShake = new Vector2(1.2f, 0.35f);
-    [SerializeField] Vector2 chargeShake = new Vector2(1.6f, 0.3f);
-    [SerializeField] Vector2 bracedShake = new Vector2(0.9f, 0.2f);
-    [SerializeField] Vector2 riderDeathShake = new Vector2(0.6f, 0.2f);
-    [SerializeField] Vector2 endShake = new Vector2(1.4f, 0.5f);
-    [Tooltip("Seconds the battle freezes when a charge lands.")]
-    [SerializeField, Min(0f)] float chargeFreeze = 0.06f;
+    [Header("Camera jolts")]
+    [Tooltip("The camera is knocked along the blow (Cinemachine impulse, a recoil shape) for three things only: the lines meeting, a cavalry charge landing on screen, and the final kill. Metres for each.")]
+    [SerializeField, Min(0f)] float contactJolt = 0.3f;
+    [SerializeField, Min(0f)] float chargeJolt = 0.18f;
+    [SerializeField, Min(0f)] float endJolt = 0.35f;
+    [Tooltip("Seconds a jolt lasts, in real time, and the fewest real seconds between two charge jolts.")]
+    [SerializeField, Min(0.05f)] float joltTime = 0.3f;
+    [SerializeField, Min(0f)] float chargeJoltGap = 1.2f;
+    [Tooltip("Seconds the battle freezes when the charge a moment is showing lands.")]
+    [SerializeField, Min(0f)] float chargeFreeze = 0.07f;
 
     [Header("Big moments")]
-    [Tooltip("Time slows and the camera pushes in when the lines meet, when cavalry charge and on the final kill. Real seconds between two moments.")]
-    [SerializeField, Min(0f)] float momentCooldown = 7f;
-    [Tooltip("Time scale and real seconds of slow motion when the lines meet, for a charge, and at the end.")]
-    [SerializeField] Vector2 contactSlow = new Vector2(0.35f, 1.1f);
-    [SerializeField] Vector2 chargeSlow = new Vector2(0.25f, 1.2f);
-    [SerializeField] Vector2 endSlow = new Vector2(0.2f, 2.2f);
-    [Tooltip("Lens field of view during a moment, and seconds to zoom in and out.")]
-    [SerializeField] float momentFieldOfView = 21f;
-    [SerializeField, Min(0.01f)] float momentZoomTime = 0.35f;
-    [Tooltip("How strongly the camera leans towards a moment: its weight in the camera group against 1 for each unit.")]
-    [SerializeField, Min(0f)] float momentFocusWeight = 6f;
+    [Tooltip("A closer camera, off until a moment, that looks the same way as the battle camera from nearer. The view moves its target to the moment and turns it on; the Cinemachine Brain blends to it and back.")]
+    [SerializeField] CinemachineCamera momentCamera;
+    [Tooltip("Time slows and the moment camera pushes in just before the lines meet: when the two lines' nearest soldiers are this many metres apart.")]
+    [SerializeField, Min(0f)] float contactWarnGap = 3.5f;
+    [Tooltip("The same for a cavalry charge: metres the riders still have to ride. Only the battle's first Charge Moments charges get a moment, so moments stay rare.")]
+    [SerializeField, Min(0f)] float chargeWarnGap = 3.5f;
+    [SerializeField, Min(0)] int chargeMoments = 1;
+    [Tooltip("Real seconds after one moment ends before another can start (the final kill always gets one).")]
+    [SerializeField, Min(0f)] float momentGap = 5f;
+    [Tooltip("Time scale and real seconds of slow motion for the lines meeting, a charge, and the final kill.")]
+    [SerializeField] Vector2 contactSlowMotion = new Vector2(0.3f, 1.8f);
+    [SerializeField] Vector2 chargeSlowMotion = new Vector2(0.25f, 1.6f);
+    [SerializeField] Vector2 endSlowMotion = new Vector2(0.25f, 2.4f);
     [Tooltip("How fast slow motion eases in and out.")]
-    [SerializeField, Min(0.1f)] float slowLerpSpeed = 8f;
+    [SerializeField, Min(0.1f)] float slowLerpSpeed = 6f;
 
     [Header("Sounds (all optional)")]
     [SerializeField] AudioSource audioSource;
@@ -183,6 +185,8 @@ public class BattleView : MonoBehaviour
         public bool landed;
         public float yaw;
         public float dustDebt;
+        /// <summary>This rider's current charge has already been checked for a moment.</summary>
+        public bool chargeSeen;
     }
 
     BattleSim sim;
@@ -193,16 +197,31 @@ public class BattleView : MonoBehaviour
     bool reported;
     ParticleSystem dust, hits;
     DamageNumber hitTemplate, heavyTemplate;
-    MMChannelData channel;
+    CinemachineImpulseSource jolts;
+    float nextChargeJoltAt;
+    /// <summary>What the moment camera follows.</summary>
     Transform focus;
-    float focusWeight, focusUntil, nextMomentAt;
+    /// <summary>The moment follows the point between these two, or stays where it started when they're null.</summary>
+    BattleSim.Unit focusUnit, focusOther;
+    float momentUntil, nextMomentAt;
+    bool contactMomentSeen;
+    int chargeMomentsSeen;
 
     /// <summary>The battle being shown, or null before the first one.</summary>
     public BattleSim Sim => sim;
 
     void Awake()
     {
-        channel = new MMChannelData(MMChannelModes.Int, 0, null);
+        // jolts: one sharp push along the blow and back, felt the same everywhere, in real time so slow motion
+        // and freeze frames don't drag them out (the cameras listen with a CinemachineImpulseListener)
+        jolts = gameObject.AddComponent<CinemachineImpulseSource>();
+        jolts.ImpulseDefinition.ImpulseChannel = 1;
+        jolts.ImpulseDefinition.ImpulseShape = CinemachineImpulseDefinition.ImpulseShapes.Recoil;
+        jolts.ImpulseDefinition.ImpulseType = CinemachineImpulseDefinition.ImpulseTypes.Uniform;
+        jolts.ImpulseDefinition.ImpulseDuration = joltTime;
+        CinemachineImpulseManager.Instance.IgnoreTimeScale = true;
+        if (momentCamera != null)
+            momentCamera.enabled = false;
         // freeze frames and slow motion. It reads the normal fixed and maximum delta times when it initialises, and
         // Begin resets the time scale from Start, so it has to be initialised before any Start runs: a reset sent to
         // an uninitialised manager sets both to zero (which Unity clamps to 0.0001 s, and the battle crawls).
@@ -212,6 +231,8 @@ public class BattleView : MonoBehaviour
         hits = MakeParticles("Hits", new Vector2(0.3f, 0.6f), new Vector2(2f, 5f), new Vector2(0.18f, 0.35f), 1.2f);
         focus = new GameObject("Moment Focus").transform;
         focus.SetParent(transform, false);
+        if (momentCamera != null)
+            momentCamera.Follow = focus;
         // hidden copies of the presets to spawn from; under an inactive parent they never run themselves
         var templates = new GameObject("Damage Number Templates");
         templates.SetActive(false);
@@ -317,7 +338,8 @@ public class BattleView : MonoBehaviour
 
         ShowUnits();
         ShowArrows();
-        ShowFocus();
+        WatchForMoments();
+        ShowMoment();
 
         if (sim.Winner != BattleSim.Running && !reported)
         {
@@ -352,8 +374,12 @@ public class BattleView : MonoBehaviour
             cameraGroup.Targets.Clear();
         stepDebt = 0f;
         reported = false;
-        focusWeight = 0f;
-        focusUntil = nextMomentAt = 0f;
+        momentUntil = nextMomentAt = nextChargeJoltAt = 0f;
+        focusUnit = focusOther = null;
+        contactMomentSeen = false;
+        chargeMomentsSeen = 0;
+        if (momentCamera != null)
+            momentCamera.enabled = false;
         MMTimeScaleEvent.Trigger(MMTimeScaleMethods.Reset, 1f, 0f, false, 0f, false);
         if (dust != null) dust.Clear();
         if (hits != null) hits.Clear();
@@ -378,7 +404,6 @@ public class BattleView : MonoBehaviour
         {
             foreach (var figure in figures)
                 cameraGroup.AddMember(figure.root, 1f, cameraUnitRadius);
-            cameraGroup.AddMember(focus, 0f, cameraUnitRadius);
         }
     }
 
@@ -601,25 +626,38 @@ public class BattleView : MonoBehaviour
             switch (e.kind)
             {
                 case BattleSim.EventKind.Contact:
-                    Shake(contactShake);
+                    // the first blow between the lines: a thud down into the ground
+                    Jolt(Vector3.down * contactJolt);
                     Play(contactClip);
-                    Moment(e.position, contactSlow);
+                    // usually the moment started as the lines closed; this catches lines that met some other way
+                    if (!contactMomentSeen)
+                    {
+                        contactMomentSeen = true;
+                        Moment(at, contactSlowMotion);
+                    }
                     break;
                 case BattleSim.EventKind.Charge:
-                    Shake(chargeShake);
+                {
+                    bool showing = Time.unscaledTime < momentUntil && (focusUnit == e.unit || focusOther == e.other);
+                    var along = transform.TransformDirection(new Vector3(e.position.x - e.unit.position.x, 0f, e.position.y - e.unit.position.y)).normalized;
+                    // pushed the way the riders were going; bigger for the charge a moment is showing
+                    if (showing || (Time.unscaledTime >= nextChargeJoltAt && OnScreen(at)))
+                    {
+                        nextChargeJoltAt = Time.unscaledTime + chargeJoltGap;
+                        Jolt((along + Vector3.down * 0.4f) * chargeJolt * (showing ? 1.6f : 1f));
+                    }
                     Play(chargeClip);
                     Squash(e.other, 3f);
                     Flinch(e.other, true);
                     ShowNumber(e.other, e.damage, true);
                     Emit(dust, World(e.position, 0.2f), dustColour, 14);
                     Emit(hits, at, hitColour, 8);
-                    // the freeze goes on top of any slow motion, so it comes second
-                    Moment(e.position, chargeSlow);
-                    if (chargeFreeze > 0f)
+                    // a freeze goes on top of the moment's slow motion
+                    if (showing && chargeFreeze > 0f)
                         MMFreezeFrameEvent.Trigger(chargeFreeze, 0f);
                     break;
+                }
                 case BattleSim.EventKind.BracedCharge:
-                    Shake(bracedShake);
                     Play(meleeHitClip);
                     Squash(e.unit, 2f);
                     ShowNumber(e.other, e.damage, false);
@@ -641,14 +679,10 @@ public class BattleView : MonoBehaviour
                 case BattleSim.EventKind.ArrowMiss:
                     Emit(dust, World(e.position, 0.05f), dustColour, 2);
                     break;
-                case BattleSim.EventKind.Death:
-                    if (e.unit.type.IsCavalry)
-                        Shake(riderDeathShake);
-                    break;
                 case BattleSim.EventKind.End:
-                    Shake(endShake);
-                    nextMomentAt = 0f;
-                    Moment(e.position, endSlow);
+                    // the last one falls, slowly, close up
+                    Jolt(Vector3.down * endJolt);
+                    Moment(World(e.position, 0f), endSlowMotion, null, null, true);
                     break;
             }
         }
@@ -692,30 +726,114 @@ public class BattleView : MonoBehaviour
             spring.Bump(new Vector3(1f, -1.4f, 1f) * hitSquash * strength);
     }
 
-    void Shake(Vector2 sizeAndTime)
+    /// <summary>Knocks the camera this far (world metres, in this direction) and lets it spring back.</summary>
+    void Jolt(Vector3 push)
     {
-        if (sizeAndTime.x > 0f && sizeAndTime.y > 0f)
-            MMCameraShakeEvent.Trigger(sizeAndTime.y, sizeAndTime.x, shakeFrequency, 0f, 0f, 0f, false, channel, true);
-    }
-
-    /// <summary>Slows time and pushes the camera in towards a point, unless another moment was too recent.</summary>
-    void Moment(Vector2 where, Vector2 scaleAndTime)
-    {
-        if (Time.unscaledTime < nextMomentAt || scaleAndTime.y <= 0f)
+        if (jolts == null || push.sqrMagnitude < 0.0001f)
             return;
-        nextMomentAt = Time.unscaledTime + scaleAndTime.y + momentCooldown;
-        MMTimeScaleEvent.Trigger(MMTimeScaleMethods.For, scaleAndTime.x, scaleAndTime.y, true, slowLerpSpeed, false);
-        MMCameraZoomEvent.Trigger(MMCameraZoomModes.For, momentFieldOfView, momentZoomTime, scaleAndTime.y, channel, true);
-        focus.localPosition = new Vector3(where.x, sim.HeightAt(where), where.y);
-        focusUntil = Time.unscaledTime + scaleAndTime.y;
+        jolts.ImpulseDefinition.ImpulseDuration = joltTime;
+        jolts.GenerateImpulseWithVelocity(push);
     }
 
-    /// <summary>Eases the camera's lean towards the current moment in and out.</summary>
-    void ShowFocus()
+    static bool OnScreen(Vector3 point)
     {
-        float wanted = Time.unscaledTime < focusUntil ? momentFocusWeight : 0f;
-        focusWeight = Mathf.MoveTowards(focusWeight, wanted, momentFocusWeight * Time.unscaledDeltaTime / Mathf.Max(0.01f, momentZoomTime));
-        SetCameraWeight(focus, focusWeight, false);
+        var camera = Camera.main;
+        if (camera == null)
+            return true;
+        var view = camera.WorldToViewportPoint(point);
+        return view.z > 0f && view.x > 0.05f && view.x < 0.95f && view.y > 0.05f && view.y < 0.95f;
+    }
+
+    /// <summary>
+    /// Starts the big moments a little before they happen, so the camera is there in time: the two lines about to
+    /// meet, and the battle's first cavalry charge about to land.
+    /// </summary>
+    void WatchForMoments()
+    {
+        if (sim.Winner != BattleSim.Running)
+            return;
+        if (!contactMomentSeen)
+        {
+            // the nearest soldiers of the two lines
+            float nearest = float.MaxValue;
+            foreach (var a in sim.units)
+            {
+                if (a.side != 0 || !a.Alive || a.type.role != UnitType.Role.Line)
+                    continue;
+                foreach (var b in sim.units)
+                {
+                    if (b.side != 1 || !b.Alive || b.type.role != UnitType.Role.Line)
+                        continue;
+                    nearest = Mathf.Min(nearest, (a.position - b.position).magnitude - a.type.radius - b.type.radius);
+                }
+            }
+            if (nearest <= contactWarnGap)
+            {
+                contactMomentSeen = true;
+                Moment(LineCentre(), contactSlowMotion);
+            }
+        }
+        for (int i = 0; i < figures.Count && i < sim.units.Count; i++)
+        {
+            var unit = sim.units[i];
+            if (!unit.type.IsCavalry)
+                continue;
+            float left = sim.ChargeDistanceLeft(unit);
+            if (left < 0f)
+            {
+                figures[i].chargeSeen = false;
+                continue;
+            }
+            if (figures[i].chargeSeen || left > chargeWarnGap)
+                continue;
+            figures[i].chargeSeen = true;
+            if (chargeMomentsSeen < chargeMoments && Moment(FigurePosition(unit), chargeSlowMotion, unit, unit.target))
+                chargeMomentsSeen++;
+        }
+    }
+
+    /// <summary>The middle of both battle lines, where they're about to meet.</summary>
+    Vector3 LineCentre()
+    {
+        Vector2 sum = Vector2.zero;
+        int count = 0;
+        foreach (var unit in sim.units)
+            if (unit.Alive && unit.type.role == UnitType.Role.Line)
+            {
+                sum += unit.position;
+                count++;
+            }
+        return World(count > 0 ? sum / count : Vector2.zero, 0f);
+    }
+
+    Vector3 FigurePosition(BattleSim.Unit unit) =>
+        unit.id < figures.Count && figures[unit.id].root != null ? figures[unit.id].root.position : World(unit.position, 0f);
+
+    /// <summary>
+    /// Slows time and cuts to the moment camera over a point (following the point between two units if given),
+    /// unless another moment ended too recently. True if it started.
+    /// </summary>
+    bool Moment(Vector3 at, Vector2 scaleAndTime, BattleSim.Unit follow = null, BattleSim.Unit other = null, bool always = false)
+    {
+        if (scaleAndTime.y <= 0f || (!always && Time.unscaledTime < nextMomentAt))
+            return false;
+        momentUntil = Time.unscaledTime + scaleAndTime.y;
+        nextMomentAt = momentUntil + momentGap;
+        MMTimeScaleEvent.Trigger(MMTimeScaleMethods.For, scaleAndTime.x, scaleAndTime.y, true, slowLerpSpeed, false);
+        focusUnit = follow;
+        focusOther = other;
+        focus.position = at;
+        return true;
+    }
+
+    /// <summary>Keeps the moment camera on the moment while it lasts, and off otherwise.</summary>
+    void ShowMoment()
+    {
+        bool on = Time.unscaledTime < momentUntil;
+        if (on && focusUnit != null)
+            focus.position = focusOther != null ? Vector3.Lerp(FigurePosition(focusUnit), FigurePosition(focusOther), 0.5f) : FigurePosition(focusUnit);
+        if (momentCamera != null && momentCamera.enabled != on)
+            momentCamera.enabled = on;
     }
 
     void SetCameraWeight(Transform member, float weight, bool removeAtZero = true)
@@ -835,6 +953,8 @@ public class BattleView : MonoBehaviour
     {
         // leave no slow motion behind
         MMTimeScaleEvent.Trigger(MMTimeScaleMethods.Reset, 1f, 0f, false, 0f, false);
+        if (momentCamera != null)
+            momentCamera.enabled = false;
     }
 
     void OnDrawGizmosSelected()
