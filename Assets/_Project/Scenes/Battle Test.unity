@@ -6775,12 +6775,9 @@ MonoBehaviour:
   cameraGroup: {fileID: 525803807}
   cameraUnitRadius: 1.5
   cameraForgetTime: 2.5
-  outlineLayerA:
-    serializedVersion: 0
-    m_Bits: 256
-  outlineLayerB:
-    serializedVersion: 0
-    m_Bits: 512
+  outfitSource: {fileID: 2100000, guid: 71e41e43b459a244abaf5acca76b89ee, type: 2}
+  outfitA: {fileID: 2100000, guid: 203cbc265aabad949b20182d58a71b67, type: 2}
+  outfitB: {fileID: 2100000, guid: f5749f6fced94624eb4467936679ebf9, type: 2}
   weaponBone: Hand_R
   weaponPosition: {x: 0, y: 0, z: 0}
   weaponRotation: {x: 0, y: 0, z: 0}

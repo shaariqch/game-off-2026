@@ -50,9 +50,10 @@ public class BattleView : MonoBehaviour
     [SerializeField, Min(0.01f)] float cameraForgetTime = 2.5f;
 
     [Header("Figures")]
-    [Tooltip("Each side's figures are drawn on this rendering layer, which picks their outline colour (Linework's Wide Outline on the URP renderers).")]
-    [SerializeField] RenderingLayerMask outlineLayerA;
-    [SerializeField] RenderingLayerMask outlineLayerB;
+    [Tooltip("The figures' own material. On each figure it's swapped for its side's outfit material, the same atlas with the clothing recoloured (Tools > Battle > Build Team Colours makes them).")]
+    [SerializeField] Material outfitSource;
+    [SerializeField] Material outfitA;
+    [SerializeField] Material outfitB;
     [Tooltip("Name of the bone a weapon is parented to.")]
     [SerializeField] string weaponBone = "Hand_R";
     [SerializeField] Vector3 weaponPosition;
@@ -134,7 +135,6 @@ public class BattleView : MonoBehaviour
         public Transform root;
         /// <summary>The body. Lunges, squashes and falling over happen here, so they don't shake the camera.</summary>
         public Transform visual;
-        public Renderer[] renderers;
         public MMSpringScale spring;
         public bool placed;
         public float seenAttackTime = -1f;
@@ -314,11 +314,22 @@ public class BattleView : MonoBehaviour
             }
         }
 
-        // the side's outline comes from the rendering layer
-        figure.renderers = visual.GetComponentsInChildren<Renderer>();
-        uint layer = (unit.side == 0 ? outlineLayerA : outlineLayerB).value;
-        foreach (var renderer in figure.renderers)
-            renderer.renderingLayerMask |= layer;
+        // dressed in the side's colour
+        var outfit = unit.side == 0 ? outfitA : outfitB;
+        if (outfitSource != null && outfit != null)
+            foreach (var renderer in visual.GetComponentsInChildren<Renderer>(true))
+            {
+                var materials = renderer.sharedMaterials;
+                bool changed = false;
+                for (int m = 0; m < materials.Length; m++)
+                    if (materials[m] == outfitSource)
+                    {
+                        materials[m] = outfit;
+                        changed = true;
+                    }
+                if (changed)
+                    renderer.sharedMaterials = materials;
+            }
 
         figure.spring = visual.gameObject.AddComponent<MMSpringScale>();
         figure.spring.Target = visual;
@@ -340,7 +351,6 @@ public class BattleView : MonoBehaviour
 
     void ShowUnits()
     {
-        uint outlines = outlineLayerA.value | outlineLayerB.value;
         for (int i = 0; i < figures.Count; i++)
         {
             var figure = figures[i];
@@ -354,10 +364,6 @@ public class BattleView : MonoBehaviour
                 {
                     figure.seenDeath = true;
                     Play(deathClip);
-                    // the dead lose their side's outline
-                    foreach (var renderer in figure.renderers)
-                        if (renderer != null)
-                            renderer.renderingLayerMask &= ~outlines;
                 }
                 float dead = sim.Time - unit.diedTime;
                 SetCameraWeight(figure.root, 1f - dead / cameraForgetTime);
