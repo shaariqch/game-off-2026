@@ -198,6 +198,8 @@ public class BattleView : MonoBehaviour
     ParticleSystem dust, hits;
     DamageNumber hitTemplate, heavyTemplate;
     CinemachineImpulseSource jolts;
+    /// <summary>Spine, head and arms: what an action moves while the figure's legs keep walking or running.</summary>
+    AvatarMask upperBodyMask;
     float nextChargeJoltAt;
     /// <summary>What the moment camera follows.</summary>
     Transform focus;
@@ -212,6 +214,11 @@ public class BattleView : MonoBehaviour
 
     void Awake()
     {
+        upperBodyMask = new AvatarMask { name = "Battle Upper Body" };
+        for (var part = AvatarMaskBodyPart.Root; part < AvatarMaskBodyPart.LastBodyPart; part++)
+            upperBodyMask.SetHumanoidBodyPartActive(part, part is AvatarMaskBodyPart.Body or AvatarMaskBodyPart.Head
+                or AvatarMaskBodyPart.LeftArm or AvatarMaskBodyPart.RightArm or AvatarMaskBodyPart.LeftFingers
+                or AvatarMaskBodyPart.RightFingers or AvatarMaskBodyPart.LeftHandIK or AvatarMaskBodyPart.RightHandIK);
         // jolts: one sharp push along the blow and back, felt the same everywhere, in real time so slow motion
         // and freeze frames don't drag them out (the cameras listen with a CinemachineImpulseListener)
         jolts = gameObject.AddComponent<CinemachineImpulseSource>();
@@ -454,7 +461,7 @@ public class BattleView : MonoBehaviour
                 animators[0].applyRootMotion = false;
                 animators[0].cullingMode = AnimatorCullingMode.CullUpdateTransforms;
                 figure.animation = new FigureAnimation(animators[0], type.idleClip, type.walkClip, type.runClip,
-                    type.walkClipSpeed, type.runClipSpeed, Random.value);
+                    type.walkClipSpeed, type.runClipSpeed, Random.value, upperBodyMask);
             }
             else
                 // unanimated figures stay in their bind pose, and their Animators would only cost time
@@ -463,17 +470,9 @@ public class BattleView : MonoBehaviour
             foreach (var collider in body.GetComponentsInChildren<Collider>())
                 collider.enabled = false;
             if (unit.type.weaponPrefab != null)
-            {
-                var hand = FindDeep(body.transform, weaponBone);
-                if (hand != null)
-                {
-                    var weapon = Instantiate(unit.type.weaponPrefab, hand);
-                    weapon.transform.localPosition = weaponPosition;
-                    weapon.transform.localRotation = Quaternion.Euler(weaponRotation);
-                    foreach (var collider in weapon.GetComponentsInChildren<Collider>())
-                        collider.enabled = false;
-                }
-            }
+                Attach(body.transform, unit.type.weaponPrefab, weaponBone, weaponPosition, weaponRotation);
+            foreach (var attachment in unit.type.attachments)
+                Attach(body.transform, attachment.prefab, attachment.bone, attachment.position, attachment.rotation);
         }
 
         // dressed in the side's colour
@@ -496,6 +495,24 @@ public class BattleView : MonoBehaviour
         figure.spring = visual.gameObject.AddComponent<MMSpringScale>();
         figure.spring.Target = visual;
         return figure;
+    }
+
+    /// <summary>Parents a prop to a bone of the body, with its colliders off.</summary>
+    static void Attach(Transform body, GameObject prefab, string bone, Vector3 position, Vector3 rotation)
+    {
+        if (prefab == null)
+            return;
+        var holder = FindDeep(body, bone);
+        if (holder == null)
+        {
+            Debug.LogWarning("No bone called " + bone + " on " + body.name + " for " + prefab.name + ".", body);
+            return;
+        }
+        var prop = Instantiate(prefab, holder);
+        prop.transform.localPosition = position;
+        prop.transform.localRotation = Quaternion.Euler(rotation);
+        foreach (var collider in prop.GetComponentsInChildren<Collider>())
+            collider.enabled = false;
     }
 
     static Transform FindDeep(Transform parent, string childName)
@@ -528,7 +545,7 @@ public class BattleView : MonoBehaviour
                     figure.seenDeath = true;
                     Play(deathClip);
                     if (dyingAnimated)
-                        figure.animation.Play(Pick(unit.type.deathClips), 0.1f, 0f, true);
+                        figure.animation.Play(Pick(unit.type.deathClips), 0.15f, 0f, true);
                 }
                 figure.animation?.Update(Time.deltaTime, 0f);
                 float dead = sim.Time - unit.diedTime;
@@ -566,7 +583,7 @@ public class BattleView : MonoBehaviour
                     var clip = unit.lastAttackRanged ? type.shootClip : Pick(type.attackClips);
                     float interval = unit.lastAttackRanged ? type.rangedInterval : type.meleeInterval;
                     if (clip != null)
-                        figure.animation.Play(clip, 0.08f, Mathf.Min(clip.length, interval * 0.95f));
+                        figure.animation.Play(clip, 0.12f, Mathf.Min(clip.length, interval * 0.95f));
                 }
             }
 
@@ -701,7 +718,8 @@ public class BattleView : MonoBehaviour
         var clips = knockback && unit.type.knockbackClips.Length > 0 ? unit.type.knockbackClips : unit.type.hitClips;
         var clip = Pick(clips);
         if (clip != null)
-            animation.Play(clip, 0.05f, knockback ? Mathf.Min(clip.length, simSettings.chargeStagger + 0.3f) : 0f);
+            // a knockback staggers the whole body back, as the charge shoves the unit; a flinch is upper body while moving
+            animation.Play(clip, knockback ? 0.08f : 0.12f, knockback ? Mathf.Min(clip.length, simSettings.chargeStagger + 0.3f) : 0f, false, knockback);
     }
 
     static AnimationClip Pick(AnimationClip[] clips) => clips != null && clips.Length > 0 ? clips[Random.Range(0, clips.Length)] : null;
@@ -715,7 +733,12 @@ public class BattleView : MonoBehaviour
         }
     }
 
-    void OnDestroy() => DisposeAnimations();
+    void OnDestroy()
+    {
+        DisposeAnimations();
+        if (upperBodyMask != null)
+            Destroy(upperBodyMask);
+    }
 
     void Squash(BattleSim.Unit unit, float strength)
     {

@@ -6,6 +6,18 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "Game/Unit Type", fileName = "Unit Type")]
 public class UnitType : ScriptableObject
 {
+    /// <summary>A prop parented to one of the figure's bones.</summary>
+    [Serializable]
+    public struct Attachment
+    {
+        public GameObject prefab;
+        [Tooltip("Name of the bone it hangs from, e.g. Hand_L or Spine_03.")]
+        public string bone;
+        [Tooltip("Position and rotation (degrees) relative to the bone.")]
+        public Vector3 position;
+        public Vector3 rotation;
+    }
+
     [Serializable]
     public struct Against
     {
@@ -70,6 +82,8 @@ public class UnitType : ScriptableObject
     public GameObject visualPrefab;
     [Tooltip("Held in the right hand. Optional.")]
     public GameObject weaponPrefab;
+    [Tooltip("Anything else the figure carries, each on its own bone: a bow in the left hand, a quiver on the back.")]
+    public Attachment[] attachments = new Attachment[0];
     [Min(0.1f)] public float visualScale = 1f;
 
     [Header("Animation (humanoid clips; empty leaves the figure still)")]

@@ -36,6 +36,15 @@ MonoBehaviour:
     targetWeight: 1
   visualPrefab: {fileID: 1074668445682794, guid: 128d74125a472834991824f3f72198b5, type: 3}
   weaponPrefab: {fileID: 0}
+  attachments:
+  - prefab: {fileID: 1836698891882270, guid: 999de633b0a5f0848b10c37d407a9d10, type: 3}
+    bone: Hand_L
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 60, y: 0, z: 0}
+  - prefab: {fileID: 1097908202323884, guid: b1b5b89fef00f174d8447662ff003a05, type: 3}
+    bone: Spine_03
+    position: {x: 0.12, y: 0.17, z: 0}
+    rotation: {x: 0, y: 20, z: 90}
   visualScale: 1
   idleClip: {fileID: 3215575822887921774, guid: ed8560f44bf9d4b48b00a743e934cf99, type: 3}
   walkClip: {fileID: 6048701035611563356, guid: 6f2f17a5242e38648b83ee303844b46c, type: 3}

@@ -22,6 +22,10 @@ JOBS = {
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Weapons/SM_Wep_Spear_01.prefab",
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Weapons/SM_Wep_Shield_01.prefab",
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Weapons/SM_Wep_Sword_01.prefab",
+        # archers: bow in the left hand, quiver on the back, and the arrows they shoot
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Weapons/SM_Prop_Bow_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Weapons/SM_Prop_Quiver_01.prefab",
+        "Assets/Synty/PolygonFantasyKingdom/Prefabs/Weapons/SM_Prop_Arrow_01.prefab",
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Props/Banners/SM_Prop_Battle_Banner_01.prefab",
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Props/Banners/SM_Prop_Battle_Banner_02.prefab",
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Props/Banners/SM_Prop_Battle_Banner_03.prefab",

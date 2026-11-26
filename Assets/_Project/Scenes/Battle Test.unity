@@ -6839,9 +6839,9 @@ MonoBehaviour:
   deathLandTime: 0.9
   speedSmoothing: 8
   hitSquash: 4
-  arrowMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-  arrowMaterial: {fileID: 2100000, guid: d14f9ebc3ee57724baea640e92bfb822, type: 2}
-  arrowScale: {x: 0.05, y: 0.05, z: 0.8}
+  arrowMesh: {fileID: 4300000, guid: 54d6e102e1f8ea949af396b4e7c022da, type: 3}
+  arrowMaterial: {fileID: 2100000, guid: 71e41e43b459a244abaf5acca76b89ee, type: 2}
+  arrowScale: {x: 1, y: 1, z: 1}
   arrowArc: 0.18
   arrowStartHeight: 1.4
   particleMaterial: {fileID: 2100000, guid: 66ae3b3ed3385d141ab07fc05476dbe7, type: 2}
