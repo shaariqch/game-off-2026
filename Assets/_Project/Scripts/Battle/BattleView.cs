@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -33,6 +34,12 @@ public class BattleView : MonoBehaviour
     [Tooltip("Battle seconds per real second.")]
     [SerializeField, Min(0f)] float speed = 1f;
     [SerializeField] bool startOnPlay = true;
+
+    [Header("Camera")]
+    [Tooltip("Every living unit is kept in this group, so a Cinemachine camera following it frames the fight. Optional.")]
+    [SerializeField] CinemachineTargetGroup cameraGroup;
+    [Tooltip("Room the camera leaves around each unit.")]
+    [SerializeField, Min(0f)] float cameraUnitRadius = 1.5f;
 
     [Header("Figures")]
     [Tooltip("Flat disc under each unit, coloured by side.")]
@@ -137,6 +144,8 @@ public class BattleView : MonoBehaviour
         figureRoot.SetParent(transform, false);
         figures.Clear();
         arrows.Clear();
+        if (cameraGroup != null)
+            cameraGroup.Targets.Clear();
         stepDebt = 0f;
         reported = false;
 
@@ -145,7 +154,12 @@ public class BattleView : MonoBehaviour
         sim = new BattleSim(armyA, armyB, Zone(spawnA), Zone(spawnB), FieldBounds(), battleSeed, simSettings, zones, armyAHolds, armyBHolds);
         Debug.Log("[Battle] started with seed " + battleSeed + ", " + sim.units.Count + " units, " + zones.Count + " terrain zones");
         foreach (var unit in sim.units)
-            figures.Add(MakeFigure(unit));
+        {
+            var figure = MakeFigure(unit);
+            figures.Add(figure);
+            if (cameraGroup != null)
+                cameraGroup.AddMember(figure.root, 1f, cameraUnitRadius);
+        }
         ShowUnits();
     }
 
@@ -249,6 +263,8 @@ public class BattleView : MonoBehaviour
                 {
                     figure.seenDeath = true;
                     Play(deathClip);
+                    if (cameraGroup != null)
+                        cameraGroup.RemoveMember(figure.root);
                 }
                 float dead = sim.Time - unit.diedTime;
                 if (dead > fallTime + corpseTime)
