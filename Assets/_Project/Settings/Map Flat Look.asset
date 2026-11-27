@@ -25,16 +25,52 @@ MonoBehaviour:
     lightContribution: 0.4
   foliage:
     shaded: {r: 0.55, g: 0.6, b: 0.72, a: 1}
-    brightness: 1.35
+    brightness: 1.15
     shadingSize: 0.5
     edgeSize: 0.08
     flatness: 0.6
     shadowPower: 0.3
-    rim: 1
+    rim: 0
     rimColour: {r: 1, g: 0.97, b: 0.8, a: 1}
     rimSize: 0.25
     lightContribution: 0.4
   leafCutoff: 0.25
+  leafTexture: 0.4
+  leafGradient: 1
+  leafGradientColour: {r: 0.45, g: 0.55, b: 0.6, a: 1}
+  leafGradientSize: 7
+  leafGradientCentre: 2.5
+  shadowColour: {r: 0.27, g: 0.26, b: 0.45, a: 0.55}
+  groundDetail: 0.3
+  groundSaturation: 1.25
+  layerOriginals:
+  - {fileID: 8574412962073106934, guid: e652d2ba621bd9a4ab1d017689e56039, type: 2}
+  - {fileID: 8574412962073106934, guid: 9f5c36e3546010746940a515bbf0494b, type: 2}
+  - {fileID: 8574412962073106934, guid: e8a19b753c680d24c98f0aee4c3f6f1a, type: 2}
+  - {fileID: 8574412962073106934, guid: 682887672aa1ee04fa1c4287014cd8bb, type: 2}
+  - {fileID: 8574412962073106934, guid: f5816bdc445560c4fac91b4e187feb46, type: 2}
+  - {fileID: 8574412962073106934, guid: f618496f497c94c47a7203e653fbeb46, type: 2}
+  - {fileID: 8574412962073106934, guid: bdaa24a20cd038e4993440171e1de7cb, type: 2}
+  - {fileID: 8574412962073106934, guid: fda3942d375f20d4ab1bce4b8da63de5, type: 2}
+  - {fileID: 8574412962073106934, guid: 224d63e1442241943b8cafe00b71bdbd, type: 2}
+  - {fileID: 8574412962073106934, guid: 5d8b54541b4b81a4082bf55c46c9076a, type: 2}
+  - {fileID: 8574412962073106934, guid: 27eba1c658e77ee4db5474a920eb69fb, type: 2}
+  layerCopies:
+  - {fileID: 8574412962073106934, guid: a127a24dcdae7bc4c93640fbc0bdf514, type: 2}
+  - {fileID: 8574412962073106934, guid: 39e1f923f02fb3b43ad447ace205887b, type: 2}
+  - {fileID: 8574412962073106934, guid: 299079d758f94284a973d24741d808eb, type: 2}
+  - {fileID: 8574412962073106934, guid: 3886a89ace48bcf4e9e55da7208b6b5c, type: 2}
+  - {fileID: 8574412962073106934, guid: 7fc5503424b55f740bae1129f19932a0, type: 2}
+  - {fileID: 8574412962073106934, guid: 449dde49e9ca6a04ca62e5218dafa1e0, type: 2}
+  - {fileID: 8574412962073106934, guid: 2dc11914979c25c4e9168de7dd46f465, type: 2}
+  - {fileID: 8574412962073106934, guid: fe5c1da9de265e94894fac59a15db87a, type: 2}
+  - {fileID: 8574412962073106934, guid: 99990f41237759c419d8cb650989c981, type: 2}
+  - {fileID: 8574412962073106934, guid: 348a60dc4c1e22245809604895de95dd, type: 2}
+  - {fileID: 8574412962073106934, guid: 040af62a2fd019f46b3c7dc55b08beba, type: 2}
+  flatProfile: {fileID: 11400000, guid: c636075ffa7347d4f8855c07892697f0, type: 2}
+  plainProfile: {fileID: 11400000, guid: 9a5bd35c27f35e84d87830a9a3aee7ed, type: 2}
+  flatSkybox: {fileID: 2100000, guid: ad61fe133c381ab46a74e585240ce9ee, type: 2}
+  plainSkybox: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
   terrainMaterial: {fileID: 2100000, guid: c024eef8b03bd164ca28718825356fb0, type: 2}
   plainTerrainMaterial: {fileID: 2100000, guid: 594ea882c5a793440b60ff72d896021e, type: 2}
   flatRenderer: 1

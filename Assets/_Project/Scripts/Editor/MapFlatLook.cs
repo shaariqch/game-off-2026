@@ -55,6 +55,37 @@ public class MapFlatLook : ScriptableObject
     [Tooltip("Leaves are cut out where their texture's alpha is below this.")]
     [Range(0f, 1f)] public float leafCutoff = 0.25f;
 
+    [Header("Foliage style")]
+    [Tooltip("How much leaf textures show through the flat colour (1 is Synty's texture as it is).")]
+    [Range(0f, 1f)] public float leafTexture = 0.4f;
+    [Tooltip("Leaves darken towards the bottom of each plant (Flat Kit's height gradient, in the plant's own space).")]
+    public bool leafGradient = true;
+    [Tooltip("The colour at the bottom: the lit colour times this.")]
+    public Color leafGradientColour = new Color(0.45f, 0.55f, 0.6f);
+    [Tooltip("Metres over which the gradient fades, and the height its middle sits at.")]
+    public float leafGradientSize = 7f;
+    public float leafGradientCentre = 2.5f;
+
+    [Header("Shadows")]
+    [Tooltip("Cast shadows take this colour instead of just darkening (alpha is how strongly).")]
+    public Color shadowColour = new Color(0.27f, 0.26f, 0.45f, 0.55f);
+
+    [Header("Ground")]
+    [Tooltip("How much of each ground layer's texture is kept: 0 paints the layer in its average colour alone.")]
+    [Range(0f, 1f)] public float groundDetail = 0.3f;
+    [Tooltip("Saturation of each ground layer's colour (1 keeps it).")]
+    [Range(0f, 2f)] public float groundSaturation = 1.25f;
+    [HideInInspector] public List<TerrainLayer> layerOriginals = new List<TerrainLayer>();
+    [HideInInspector] public List<TerrainLayer> layerCopies = new List<TerrainLayer>();
+
+    [Header("Post-processing and sky")]
+    [Tooltip("The map volume's profile with the look (no ACES, Flat Kit style grading) and without it.")]
+    public UnityEngine.Rendering.VolumeProfile flatProfile;
+    public UnityEngine.Rendering.VolumeProfile plainProfile;
+    [Tooltip("Flat Kit's gradient sky, seen past the edges of the strip, and the sky it replaces.")]
+    public Material flatSkybox;
+    public Material plainSkybox;
+
     [Header("Land and camera")]
     [Tooltip("Flat Kit's terrain material for the map tiles (its own settings are on the material).")]
     public Material terrainMaterial;
@@ -136,6 +167,43 @@ public class MapFlatLook : ScriptableObject
                 terrain.materialTemplate = land;
             }
         }
+        int layers = 0;
+        foreach (var terrain in terrains)
+        {
+            var data = terrain.terrainData;
+            var current = data.terrainLayers;
+            bool changed = false;
+            for (int i = 0; i < current.Length; i++)
+            {
+                var next = flat ? FlatLayer(current[i]) : OriginalLayer(current[i]);
+                if (next != current[i])
+                {
+                    current[i] = next;
+                    changed = true;
+                    layers++;
+                }
+            }
+            if (changed)
+            {
+                data.terrainLayers = current;
+                EditorUtility.SetDirty(data);
+            }
+        }
+
+        foreach (var volume in FindObjectsByType<UnityEngine.Rendering.Volume>())
+        {
+            var profile = flat ? flatProfile : plainProfile;
+            var other = flat ? plainProfile : flatProfile;
+            if (profile != null && volume.sharedProfile == other)
+            {
+                Undo.RecordObject(volume, flat ? "Apply Flat Kit Look" : "Remove Flat Kit Look");
+                volume.sharedProfile = profile;
+            }
+        }
+        var sky = flat ? flatSkybox : plainSkybox;
+        if (sky != null)
+            RenderSettings.skybox = sky;
+
         var cameraData = Camera.main != null ? Camera.main.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>() : null;
         if (cameraData != null)
         {
@@ -172,13 +240,83 @@ public class MapFlatLook : ScriptableObject
         AssetDatabase.SaveAssets();
         if (towns != null)
             EditorSceneManager.MarkSceneDirty(towns.scene);
-        Debug.Log($"[Map] {(flat ? "applied" : "removed")} the Flat Kit look: {swapped} town renderers, {trees} tree prototypes");
+        Debug.Log($"[Map] {(flat ? "applied" : "removed")} the Flat Kit look: {swapped} town renderers, {trees} tree prototypes, {layers} ground layers");
     }
 
     Material Original(Material material)
     {
         int index = copies.IndexOf(material);
         return index >= 0 && originals[index] != null ? originals[index] : material;
+    }
+
+    TerrainLayer OriginalLayer(TerrainLayer layer)
+    {
+        int index = layerCopies.IndexOf(layer);
+        return index >= 0 && layerOriginals[index] != null ? layerOriginals[index] : layer;
+    }
+
+    /// <summary>
+    /// A copy of a ground layer painted mostly in its average colour (<see cref="groundDetail"/> of the texture kept),
+    /// with no normal map, so the land reads as flat colour and Flat Kit's cel shading does the modelling.
+    /// </summary>
+    TerrainLayer FlatLayer(TerrainLayer source)
+    {
+        if (source == null || source.diffuseTexture == null)
+            return source;
+        int index = layerOriginals.IndexOf(source);
+        string guid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(source)).Substring(0, 6);
+        string texturePath = $"{Output}/Ground/{source.name} {guid} Flat.png";
+        string layerPath = $"{Output}/Ground/{source.name} {guid} Flat.terrainlayer";
+        Directory.CreateDirectory(Output + "/Ground");
+
+        const int size = 128;
+        var target = RenderTexture.GetTemporary(size, size, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+        Graphics.Blit(source.diffuseTexture, target);
+        var previous = RenderTexture.active;
+        RenderTexture.active = target;
+        var image = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        image.ReadPixels(new Rect(0, 0, size, size), 0, 0);
+        RenderTexture.active = previous;
+        RenderTexture.ReleaseTemporary(target);
+        var pixels = image.GetPixels();
+        Color average = Color.clear;
+        foreach (var pixel in pixels) average += pixel;
+        average /= pixels.Length;
+        Color.RGBToHSV(average, out float hue, out float saturation, out float value);
+        var shift = Color.HSVToRGB(hue, Mathf.Clamp01(saturation * groundSaturation), value) - average;
+        for (int i = 0; i < pixels.Length; i++)
+            pixels[i] = Color.Lerp(average, pixels[i], groundDetail) + shift;
+        image.SetPixels(pixels);
+        File.WriteAllBytes(texturePath, image.EncodeToPNG());
+        DestroyImmediate(image);
+        AssetDatabase.ImportAsset(texturePath);
+        var importer = (TextureImporter)AssetImporter.GetAtPath(texturePath);
+        importer.wrapMode = TextureWrapMode.Repeat;
+        importer.mipmapEnabled = true;
+        importer.SaveAndReimport();
+
+        var copy = index >= 0 ? layerCopies[index] : null;
+        if (copy == null)
+        {
+            copy = new TerrainLayer();
+            AssetDatabase.CreateAsset(copy, layerPath);
+            if (index >= 0) layerCopies[index] = copy;
+            else
+            {
+                layerOriginals.Add(source);
+                layerCopies.Add(copy);
+            }
+        }
+        copy.diffuseTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+        copy.normalMapTexture = null;
+        copy.tileSize = source.tileSize;
+        copy.tileOffset = source.tileOffset;
+        copy.diffuseRemapMin = source.diffuseRemapMin;
+        copy.diffuseRemapMax = source.diffuseRemapMax;
+        copy.smoothness = 0f;
+        copy.metallic = 0f;
+        EditorUtility.SetDirty(copy);
+        return copy;
     }
 
     GameObject OriginalTree(GameObject prefab)
@@ -235,10 +373,20 @@ public class MapFlatLook : ScriptableObject
                     ? (colour + source.GetColor("_Leaf_Noise_Color") + source.GetColor("_Leaf_Noise_Large_Color")) / 3f
                     : colour * (source.GetColor("_Leaf_Noise_Color") + source.GetColor("_Leaf_Noise_Large_Color")) * 0.5f;
         }
+        // a textured leaf shows only some of its texture; the rest of its colour moves into the base colour, so the
+        // average colour stays Synty's: base = average texture x tint / what the texture still multiplies by
+        float impact = flatLeaves ? 0f : foliage ? leafTexture : 1f;
+        if (foliage && !flatLeaves)
+        {
+            var average = Average(texture);
+            var kept = Color.Lerp(Color.white, average, impact);
+            colour = new Color(colour.r * average.r / Mathf.Max(0.05f, kept.r), colour.g * average.g / Mathf.Max(0.05f, kept.g),
+                colour.b * average.b / Mathf.Max(0.05f, kept.b));
+        }
         var lit = WithAlpha(colour * cel.brightness);
         copy.SetColor("_BaseColor", lit);
         copy.SetTexture("_BaseMap", texture);
-        copy.SetFloat("_TextureImpact", flatLeaves ? 0f : 1f);
+        copy.SetFloat("_TextureImpact", impact);
         copy.SetFloat("_TextureBlendingMode", 0f);
         copy.EnableKeyword("_TEXTUREBLENDINGMODE_MULTIPLY");
 
@@ -251,9 +399,24 @@ public class MapFlatLook : ScriptableObject
         copy.SetFloat("_Flatness", cel.flatness);
         copy.SetFloat("_LightContribution", cel.lightContribution);
 
-        copy.SetFloat("_UnityShadowMode", 1f);
-        copy.EnableKeyword("_UNITYSHADOWMODE_MULTIPLY");
-        copy.SetFloat("_UnityShadowPower", cel.shadowPower);
+        // cast shadows in a colour of their own rather than plain darkening
+        copy.SetFloat("_UnityShadowMode", 2f);
+        copy.EnableKeyword("_UNITYSHADOWMODE_COLOR");
+        copy.SetColor("_UnityShadowColor", new Color(shadowColour.r, shadowColour.g, shadowColour.b, shadowColour.a * cel.shadowPower / 0.35f));
+        copy.SetFloat("_UnityShadowSharpness", 3f);
+
+        copy.SetFloat("_GradientEnabled", foliage && leafGradient ? 1f : 0f);
+        if (foliage && leafGradient)
+        {
+            copy.EnableKeyword("DR_GRADIENT_ON");
+            copy.SetFloat("_GradientSpace", 1f);
+            copy.EnableKeyword("_GRADIENTSPACE_LOCAL");
+            copy.SetColor("_ColorGradient", WithAlpha(lit * leafGradientColour));
+            copy.SetFloat("_GradientCenterX", 0f);
+            copy.SetFloat("_GradientCenterY", leafGradientCentre);
+            copy.SetFloat("_GradientSize", leafGradientSize);
+            copy.SetFloat("_GradientAngle", 0f);
+        }
 
         copy.SetFloat("_RimEnabled", cel.rim ? 1f : 0f);
         if (cel.rim)
@@ -311,6 +474,31 @@ public class MapFlatLook : ScriptableObject
             treeCopies.Add(copy);
         }
         return copy;
+    }
+
+    /// <summary>The average colour of a texture's visible pixels (alpha over a half).</summary>
+    static Color Average(Texture texture)
+    {
+        if (texture == null)
+            return Color.white;
+        var target = RenderTexture.GetTemporary(64, 64, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+        Graphics.Blit(texture, target);
+        var previous = RenderTexture.active;
+        RenderTexture.active = target;
+        var image = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+        image.ReadPixels(new Rect(0, 0, 64, 64), 0, 0);
+        RenderTexture.active = previous;
+        RenderTexture.ReleaseTemporary(target);
+        Color sum = Color.clear;
+        int count = 0;
+        foreach (var pixel in image.GetPixels())
+            if (pixel.a > 0.5f)
+            {
+                sum += pixel;
+                count++;
+            }
+        DestroyImmediate(image);
+        return count > 0 ? sum / count : Color.white;
     }
 
     static Color WithAlpha(Color colour)
