@@ -41,6 +41,10 @@ public class UnitType : ScriptableObject
 
     [Header("Market")]
     [Min(1)] public int cost = 10;
+    [Tooltip("Shown under the market list when this type is selected.")]
+    [TextArea] public string description;
+    [Tooltip("The type's icon in the market list.")]
+    public Texture2D icon;
 
     [Header("Battle role")]
     public Role role;

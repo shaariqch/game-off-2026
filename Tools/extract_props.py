@@ -58,6 +58,10 @@ JOBS = {
     r"E:\Game Assets\Synty\POLYGON - Icons Pack": [
         r"re:PolygonIcons/Prefabs/SM_Icon_(Axe_0[12]|Shield_01|KnightHelmet_01|Armour_01|Crafting_Feather_01|Dagger_01|Sword_0[12]|Coin_0[1-3]|Coins_01|Arrow_0[1-5]|Arrow_Angled_01|Chevron_01|Crown_01|Banner_0[12]|Flag_01|Crafting_Bolt_01|Boots_01|Farm_01|Crop_01|Skull_01)\.prefab$",
     ],
+    # every UI sound (the user's call, 2026-11-27): the HUD's clicks, ticks, coins and notices come from here
+    os.path.join(os.environ.get("APPDATA", ""), r"Unity\Asset Store-5.x\Celeris Lab\AudioSound FX\The Complete UI Sound Effects Library.unitypackage"): [
+        r"re:^Assets/CelerisLab/",
+    ],
     # the kingdom map, from Synty's three nature biome packs. Entries starting "re:" are patterns matched against the
     # paths inside the package. Meadow Forest: the broadleaf woods, birches, orchards, meadow rocks and the grass,
     # dirt and rock ground layers. Alpine Mountain: pines, mountain rocks and cliffs, snow and rocky ground.
@@ -88,6 +92,7 @@ REMAP = {
     # the repository is public: everything from Synty stays in the git-ignored ThirdParty folder
     "Assets/Synty/": "Assets/_Project/ThirdParty/Synty/",
     "Assets/Quirky Series/": "Assets/_Project/ThirdParty/Quirky Series/",
+    "Assets/CelerisLab/": "Assets/_Project/ThirdParty/CelerisLab/",
 }
 # python Tools/extract_props.py icons: only the jobs whose pack name contains that word, to skip re-reading the rest
 if len(sys.argv) > 1:

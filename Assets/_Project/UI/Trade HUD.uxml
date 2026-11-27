@@ -1,0 +1,45 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="project://database/Assets/_Project/UI/Trade%20HUD.uss" />
+    <ui:VisualElement name="hud" class="hud" picking-mode="Ignore">
+        <ui:VisualElement name="notices" picking-mode="Ignore" />
+
+        <ui:VisualElement name="top" picking-mode="Ignore">
+            <ui:VisualElement name="cash" class="panel">
+                <ui:VisualElement name="cash-icon" class="icon" />
+                <ui:Label name="cash-value" class="number" text="0" />
+            </ui:VisualElement>
+            <ui:VisualElement name="timeline" class="panel">
+                <ui:VisualElement name="track">
+                    <ui:VisualElement name="track-ahead" class="track-line" />
+                    <ui:VisualElement name="track-behind" class="track-line" />
+                    <ui:VisualElement name="event-dots" style="position: absolute; left: 0; top: 0; right: 0; bottom: 0;" />
+                    <ui:VisualElement name="now" class="dot" />
+                </ui:VisualElement>
+                <ui:Label name="battle-label" class="serif" text="Battle 1 of 5" />
+                <ui:VisualElement name="battle-icon" class="icon" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="units" class="panel">
+            <ui:VisualElement class="unit-header muted">
+                <ui:VisualElement class="col-name" />
+                <ui:Label class="col-held" text="Held" />
+                <ui:Label class="col-price" text="Price" />
+            </ui:VisualElement>
+            <ui:VisualElement name="unit-rows" />
+            <ui:Label name="description" class="muted" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="controls" picking-mode="Ignore">
+            <ui:VisualElement name="buy" class="key" />
+            <ui:VisualElement name="sell" class="key" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="skip" picking-mode="Ignore">
+            <ui:VisualElement class="panel skip-panel">
+                <ui:Label class="kbd serif" text="Enter" />
+                <ui:Label class="muted" text="Skip battle" style="font-size: 17px;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

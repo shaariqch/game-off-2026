@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: Militia
   m_EditorClassIdentifier: Assembly-CSharp::UnitType
   cost: 10
+  description: An everyday soldier. No real strengths, but has power in numbers.
+  icon: {fileID: 2800000, guid: 975cd361ca8a0944ca2321f7e0cba08e, type: 3}
   role: 0
   rank: 1
   bracesCharge: 0
@@ -33,6 +35,8 @@ MonoBehaviour:
   against: []
   visualPrefab: {fileID: 1052137612577496, guid: b3a21033f5e25ef47a403070d1d96983, type: 3}
   weaponPrefab: {fileID: 1588372535281458, guid: a1179b3754a6656469126cba8b02cba5, type: 3}
+  attachments: []
+  mount: {fileID: 0}
   visualScale: 1
   idleClip: {fileID: 1827226128182048838, guid: a4b8f2deec6a99945987cfc59b1b4e54, type: 3}
   walkClip: {fileID: 2571081563578608591, guid: eead3eb07cb89cb4eb25b3550df5e84b, type: 3}

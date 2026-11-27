@@ -1,0 +1,461 @@
+/* The Trade HUD, from the "mix" mockup: Clean Minimal's flat layout in the game's own colours and type.
+   Sizes are for a 1440 by 810 reference screen; the panel settings scale it to the real one. */
+
+.hud {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    color: rgb(241, 230, 208);
+    -unity-font-definition: url("project://database/Assets/_Project/Fonts/AlegreyaSans-Regular-Lining.ttf");
+    font-size: 17px;
+}
+
+.panel {
+    background-color: rgba(27, 23, 36, 0.85);
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.serif {
+    -unity-font-definition: url("project://database/Assets/_Project/Fonts/Cinzel-Bold.ttf");
+}
+
+.number {
+    -unity-font-definition: url("project://database/Assets/_Project/Fonts/AlegreyaSans-Bold-Lining.ttf");
+}
+
+.muted {
+    color: rgb(216, 207, 193);
+}
+
+.icon {
+    flex-shrink: 0;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+/* top bar: cash, then the timeline to the battle */
+
+#top {
+    position: absolute;
+    left: 22px;
+    right: 22px;
+    top: 22px;
+    height: 52px;
+    flex-direction: row;
+}
+
+#cash {
+    flex-direction: row;
+    align-items: center;
+    padding-left: 14px;
+    padding-right: 18px;
+    margin-right: 11px;
+}
+
+#cash-icon {
+    width: 30px;
+    height: 30px;
+    margin-right: 10px;
+}
+
+#cash-value {
+    font-size: 24px;
+}
+
+#timeline {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: center;
+    padding-left: 22px;
+    padding-right: 22px;
+}
+
+#track {
+    flex-grow: 1;
+    height: 22px;
+    margin-right: 16px;
+}
+
+.track-line {
+    position: absolute;
+    top: 10px;
+    height: 2px;
+}
+
+#track-ahead {
+    left: 0;
+    right: 0;
+    background-color: rgba(241, 230, 208, 0.28);
+}
+
+#track-behind {
+    left: 0;
+    width: 0;
+    background-color: rgb(241, 230, 208);
+}
+
+.dot {
+    position: absolute;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
+}
+
+#now {
+    background-color: rgb(241, 230, 208);
+}
+
+.dot--notice {
+    background-color: rgb(127, 196, 201);
+}
+
+.dot--invasion {
+    background-color: rgb(224, 101, 79);
+}
+
+.dot--past {
+    opacity: 0.35;
+}
+
+#battle-label {
+    font-size: 16px;
+    margin-right: 10px;
+}
+
+#battle-icon {
+    width: 28px;
+    height: 28px;
+}
+
+.timeline--battle #battle-label {
+    color: rgb(227, 184, 102);
+}
+
+/* the unit list */
+
+#units {
+    position: absolute;
+    right: 22px;
+    top: 85px;
+    width: 420px;
+    padding-top: 14px;
+    padding-left: 11px;
+    padding-right: 11px;
+    padding-bottom: 18px;
+}
+
+.unit-header {
+    flex-direction: row;
+    padding-left: 22px;
+    padding-right: 22px;
+    padding-bottom: 2px;
+    font-size: 15px;
+}
+
+.col-name {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: center;
+}
+
+.col-held {
+    width: 70px;
+    -unity-text-align: middle-right;
+}
+
+.col-price {
+    width: 96px;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    -unity-text-align: middle-right;
+}
+
+.unit-row {
+    flex-direction: row;
+    align-items: center;
+    height: 56px;
+    margin-top: 4px;
+    padding-left: 22px;
+    padding-right: 22px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+    border-left-color: rgba(0, 0, 0, 0);
+    border-right-color: rgba(0, 0, 0, 0);
+    border-top-color: rgba(0, 0, 0, 0);
+    border-bottom-color: rgba(0, 0, 0, 0);
+}
+
+.unit-icon {
+    width: 34px;
+    height: 34px;
+    margin-right: 14px;
+}
+
+.unit-name {
+    font-size: 19px;
+}
+
+.unit-held,
+.unit-price {
+    font-size: 24px;
+}
+
+.unit-held--none {
+    color: rgb(181, 172, 159);
+}
+
+.trend {
+    width: 16px;
+    margin-left: 4px;
+    font-size: 13px;
+    -unity-text-align: middle-center;
+}
+
+.unit-row--selected {
+    background-color: rgb(227, 184, 102);
+    color: rgb(27, 23, 36);
+}
+
+.unit-row--selected .unit-held--none {
+    color: rgb(27, 23, 36);
+}
+
+/* with the map focused, the selection shows as an outline */
+.units--map-focus .unit-row--selected {
+    background-color: rgba(0, 0, 0, 0);
+    color: rgb(241, 230, 208);
+    border-left-color: rgb(227, 184, 102);
+    border-right-color: rgb(227, 184, 102);
+    border-top-color: rgb(227, 184, 102);
+    border-bottom-color: rgb(227, 184, 102);
+}
+
+.units--map-focus .unit-row--selected .unit-held--none {
+    color: rgb(181, 172, 159);
+}
+
+#description {
+    margin-top: 8px;
+    margin-left: 22px;
+    margin-right: 22px;
+    white-space: normal;
+    font-size: 17px;
+}
+
+/* notices pinned to places on the map */
+
+#notices {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.notice {
+    position: absolute;
+    flex-direction: row;
+    align-items: center;
+}
+
+.notice-marker {
+    width: 12px;
+    height: 12px;
+    margin-right: 11px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    background-color: rgb(241, 230, 208);
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+    border-left-color: rgb(27, 23, 36);
+    border-right-color: rgb(27, 23, 36);
+    border-top-color: rgb(27, 23, 36);
+    border-bottom-color: rgb(27, 23, 36);
+}
+
+.notice-panel {
+    flex-direction: row;
+    align-items: center;
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.notice-dot {
+    width: 12px;
+    height: 12px;
+    margin-right: 10px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.notice-text {
+    font-size: 17px;
+}
+
+.ping {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    margin-left: -22px;
+    border-top-left-radius: 22px;
+    border-top-right-radius: 22px;
+    border-bottom-left-radius: 22px;
+    border-bottom-right-radius: 22px;
+    align-items: center;
+    justify-content: center;
+}
+
+/* the two Shift keys */
+
+#controls {
+    position: absolute;
+    left: 22px;
+    right: 22px;
+    bottom: 22px;
+    height: 100px;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: stretch;
+}
+
+.key {
+    width: 300px;
+    overflow: hidden;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    background-color: rgb(42, 36, 51);
+    color: rgb(241, 230, 208);
+}
+
+.key-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 300px;
+    bottom: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+.key-label {
+    font-size: 36px;
+    margin-left: 14px;
+    margin-right: 14px;
+}
+
+.key-count {
+    font-size: 36px;
+    display: none;
+}
+
+.key-arrow {
+    width: 28px;
+    height: 28px;
+}
+
+.key-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    overflow: hidden;
+    background-color: rgb(227, 184, 102);
+    color: rgb(27, 23, 36);
+}
+
+/* buy is the gold key while nothing is happening */
+#buy.key--idle .key-fill {
+    width: 100%;
+}
+
+.key--holding {
+    border-left-width: 3px;
+    border-right-width: 3px;
+    border-top-width: 3px;
+    border-bottom-width: 3px;
+    border-left-color: rgb(227, 184, 102);
+    border-right-color: rgb(227, 184, 102);
+    border-top-color: rgb(227, 184, 102);
+    border-bottom-color: rgb(227, 184, 102);
+}
+
+/* with a border the content box shrinks; keep the label where it was */
+.key--holding .key-content {
+    left: -3px;
+    top: -3px;
+    bottom: -3px;
+}
+
+.key--has-count .key-count {
+    display: flex;
+}
+
+.key--closed {
+    opacity: 0.4;
+}
+
+#skip {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 34px;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    display: none;
+}
+
+.hud--battle #skip {
+    display: flex;
+}
+
+.skip-panel {
+    flex-direction: row;
+    align-items: center;
+    padding-left: 10px;
+    padding-right: 18px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.kbd {
+    height: 44px;
+    padding-left: 16px;
+    padding-right: 16px;
+    margin-right: 14px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    background-color: rgb(42, 36, 51);
+    font-size: 14px;
+    -unity-text-align: middle-center;
+}

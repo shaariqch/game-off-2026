@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: Spearmen
   m_EditorClassIdentifier: Assembly-CSharp::UnitType
   cost: 20
+  description: A well rounded unit, but stronger against mounted units.
+  icon: {fileID: 2800000, guid: 94517ea80f6d10c468448605dd9e7635, type: 3}
   role: 0
   rank: 0
   bracesCharge: 1
@@ -36,6 +38,8 @@ MonoBehaviour:
     targetWeight: 1
   visualPrefab: {fileID: 1741276027538082, guid: 767b276e5b6e4b14bbcd51b5a6e78ca8, type: 3}
   weaponPrefab: {fileID: 1740278935084508, guid: ef32dfc4d6986a54f879704fda89f164, type: 3}
+  attachments: []
+  mount: {fileID: 0}
   visualScale: 1
   idleClip: {fileID: 1827226128182048838, guid: a4b8f2deec6a99945987cfc59b1b4e54, type: 3}
   walkClip: {fileID: 2571081563578608591, guid: eead3eb07cb89cb4eb25b3550df5e84b, type: 3}

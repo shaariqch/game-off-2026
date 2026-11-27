@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: Cavalry
   m_EditorClassIdentifier: Assembly-CSharp::UnitType
   cost: 40
+  description: A fast mounted unit. Strong against ranged units and militia, but expensive.
+  icon: {fileID: 2800000, guid: d63746406492605469f5001efe36ce3b, type: 3}
   role: 2
   rank: 0
   bracesCharge: 0

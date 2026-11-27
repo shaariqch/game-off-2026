@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: Archers
   m_EditorClassIdentifier: Assembly-CSharp::UnitType
   cost: 20
+  description: A ranged unit. Strong at a distance, but weak up close.
+  icon: {fileID: 2800000, guid: 2f87c18fb9759264c838ac3a80bd0440, type: 3}
   role: 1
   rank: 0
   bracesCharge: 0
@@ -45,6 +47,7 @@ MonoBehaviour:
     bone: Spine_03
     position: {x: 0.12, y: 0.17, z: 0}
     rotation: {x: 0, y: 20, z: 90}
+  mount: {fileID: 0}
   visualScale: 1
   idleClip: {fileID: 3215575822887921774, guid: ed8560f44bf9d4b48b00a743e934cf99, type: 3}
   walkClip: {fileID: 6048701035611563356, guid: 6f2f17a5242e38648b83ee303844b46c, type: 3}
