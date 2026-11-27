@@ -137,6 +137,29 @@ public class KingdomMapBuilder : ScriptableObject
     [Tooltip("How far inland a beach can reach from the water's edge, in metres.")]
     [Min(0.5f)] public float beachWidth = 6f;
 
+    public enum EdgeStyle { Cut, Diorama, Haze }
+
+    [Header("Edges")]
+    [Tooltip("Cut: the land just stops. Diorama: the strip stands as a block with layered earth sides. " +
+             "Haze: the land carries on past the sides and the north end, sinking into a sea mist. " +
+             "Diorama and Haze are trials the user didn't take to (2026-11-27); Cut is in use.")]
+    public EdgeStyle edges = EdgeStyle.Cut;
+    [Tooltip("Haze: how far the land carries on past each side, in metres.")]
+    [Min(16f)] public float sideMargin = 128f;
+    [Tooltip("Haze: over how many metres past a side the land sinks into the sea.")]
+    [Min(5f)] public float sideFade = 75f;
+    [Tooltip("Haze: the height the land sinks to past the sides, in metres.")]
+    public float sideLevel = -3f;
+    [Tooltip("Haze: the mist starts this far past an edge and is solid by the second distance, in metres.")]
+    public Vector2 hazeDistance = new Vector2(8f, 95f);
+    [Tooltip("Haze: the mist's height above sea level, in metres.")]
+    public float hazeHeight = 2.5f;
+    public Material hazeMaterial;
+    [Tooltip("Diorama: the bottom of the block, in metres.")]
+    public float dioramaBase = -18f;
+    public Material dioramaSideMaterial;
+    public Material dioramaTableMaterial;
+
     [Header("Plants and rocks")]
     public List<Scatter> scatter = new List<Scatter>();
     [Tooltip("Nothing grows within this many metres of these towns, to leave room to build them.")]
@@ -205,9 +228,13 @@ public class KingdomMapBuilder : ScriptableObject
         var terrains = MakeTerrains(root);
         int planted = Plant(terrains);
         int waterParts = MakeWater(root, rivers);
+        if (edges == EdgeStyle.Haze)
+            MakeHazeEdges(root, terrains);
+        else if (edges == EdgeStyle.Diorama)
+            MakeDioramaEdges(root);
         EditorSceneManager.MarkSceneDirty(root.scene);
         return $"Kingdom map built in {timer.ElapsedMilliseconds / 1000f:F1} s: {tiles} tiles, {width:F0} by {length:F0} m, " +
-               $"{rivers.Count} rivers, {waterParts} water meshes, {planted} plants and rocks.";
+               $"{rivers.Count} rivers, {waterParts} water meshes, {planted} plants and rocks, edges: {edges}.";
     }
 
     // Map pixels (y down) for a world position (z north).
@@ -653,7 +680,7 @@ public class KingdomMapBuilder : ScriptableObject
     {
         if (!AssetDatabase.IsValidFolder(outputFolder))
             Directory.CreateDirectory(outputFolder);
-        var layers = new List<TerrainLayer> { grass, grassDry, grassFlowers, forestFloor, pineFloor, swampGrass, mud, shore, rock, snow };
+        var layers = Layers();
         float tileLength = length / tiles;
         var land = new GameObject("Land");
         land.transform.SetParent(root.transform, false);
@@ -661,69 +688,9 @@ public class KingdomMapBuilder : ScriptableObject
         int res = heightmapResolution, ares = alphamapResolution;
         for (int t = 0; t < tiles; t++)
         {
-            string path = $"{outputFolder}/Kingdom Land {t + 1}.asset";
-            var data = AssetDatabase.LoadAssetAtPath<TerrainData>(path);
-            if (data == null)
-            {
-                data = new TerrainData();
-                AssetDatabase.CreateAsset(data, path);
-            }
-            data.heightmapResolution = res;
-            data.alphamapResolution = ares;
-            data.baseMapResolution = 512;
-            data.size = new Vector3(width, terrainHeight, tileLength);
-            var h = new float[res, res];
             int offset = t * (res - 1);
-            for (int z = 0; z < res; z++)
-            for (int x = 0; x < res; x++)
-                h[z, x] = Mathf.Clamp01((heights[(offset + z) * nx + x] - seaFloor) / terrainHeight);
-            data.SetHeights(0, 0, h);
-            // each tile keeps only the layers it uses (at most 8, two passes), most used first
-            var full = Splat(t, ares, layers.Count);
-            var use = new List<int>();
-            var totals = new float[layers.Count];
-            for (int z = 0; z < ares; z++)
-            for (int x = 0; x < ares; x++)
-            for (int k = 0; k < layers.Count; k++)
-                totals[k] += full[z, x, k];
-            for (int k = 0; k < layers.Count; k++)
-                if (layers[k] != null && totals[k] > ares * ares * 0.0005f)
-                    use.Add(k);
-            use.Sort((a, b) => totals[b].CompareTo(totals[a]));
-            if (use.Count > 8)
-                use.RemoveRange(8, use.Count - 8);
-            var maps = new float[ares, ares, use.Count];
-            for (int z = 0; z < ares; z++)
-            for (int x = 0; x < ares; x++)
-            {
-                float sum = 0f;
-                for (int i = 0; i < use.Count; i++)
-                    sum += maps[z, x, i] = full[z, x, use[i]];
-                for (int i = 0; i < use.Count; i++)
-                    maps[z, x, i] = sum > 0f ? maps[z, x, i] / sum : (i == 0 ? 1f : 0f);
-            }
-            data.terrainLayers = use.ConvertAll(k => layers[k]).ToArray();
-            data.SetAlphamaps(0, 0, maps);
-            data.treeInstances = Array.Empty<TreeInstance>();
-            EditorUtility.SetDirty(data);
-
-            var go = Terrain.CreateTerrainGameObject(data);
-            go.name = $"Land {t + 1}";
-            go.transform.SetParent(land.transform, false);
-            go.transform.localPosition = new Vector3(0f, seaFloor, t * tileLength);
-            var terrain = go.GetComponent<Terrain>();
-            var pipeline = GraphicsSettings.currentRenderPipeline;
-            if (pipeline != null && pipeline.defaultTerrainMaterial != null)
-                terrain.materialTemplate = pipeline.defaultTerrainMaterial;
-            terrain.drawInstanced = true;
-            terrain.heightmapPixelError = 4f;
-            terrain.basemapDistance = 400f;
-            terrain.treeDistance = 900f;
-            terrain.treeBillboardDistance = 900f;
-            terrain.treeMaximumFullLODCount = 2000;
-            terrain.groupingID = 7;
-            terrain.allowAutoConnect = true;
-            terrains[t] = terrain;
+            terrains[t] = CreateTile(land.transform, $"Land {t + 1}", $"Kingdom Land {t + 1}", 0f, t * tileLength, width, tileLength,
+                res, ares, (x, z) => heights[(offset + z) * nx + x], layers, 4f);
         }
         for (int t = 0; t < tiles; t++)
             terrains[t].SetNeighbors(null, t + 1 < tiles ? terrains[t + 1] : null, null, t > 0 ? terrains[t - 1] : null);
@@ -731,18 +698,115 @@ public class KingdomMapBuilder : ScriptableObject
         return terrains;
     }
 
-    float[,,] Splat(int tile, int ares, int count)
+    List<TerrainLayer> Layers() => new List<TerrainLayer> { grass, grassDry, grassFlowers, forestFloor, pineFloor, swampGrass, mud, shore, rock, snow };
+
+    /// <summary>A terrain tile over a rectangle of the world. Heights come from height(column, row) in metres.</summary>
+    Terrain CreateTile(Transform parent, string name, string asset, float x0, float z0, float w, float l, int res, int ares,
+                       Func<int, int, float> height, List<TerrainLayer> layers, float pixelError)
+    {
+        string path = $"{outputFolder}/{asset}.asset";
+        var data = AssetDatabase.LoadAssetAtPath<TerrainData>(path);
+        if (data == null)
+        {
+            data = new TerrainData();
+            AssetDatabase.CreateAsset(data, path);
+        }
+        data.heightmapResolution = res;
+        data.alphamapResolution = ares;
+        data.baseMapResolution = 512;
+        data.size = new Vector3(w, terrainHeight, l);
+        var h = new float[res, res];
+        for (int z = 0; z < res; z++)
+        for (int x = 0; x < res; x++)
+            h[z, x] = Mathf.Clamp01((height(x, z) - seaFloor) / terrainHeight);
+        data.SetHeights(0, 0, h);
+        // each tile keeps only the layers it uses (at most 8, two passes), most used first
+        var full = Splat(x0, z0, w, l, ares, layers.Count);
+        var use = new List<int>();
+        var totals = new float[layers.Count];
+        for (int z = 0; z < ares; z++)
+        for (int x = 0; x < ares; x++)
+        for (int k = 0; k < layers.Count; k++)
+            totals[k] += full[z, x, k];
+        for (int k = 0; k < layers.Count; k++)
+            if (layers[k] != null && totals[k] > ares * ares * 0.0005f)
+                use.Add(k);
+        use.Sort((a, b) => totals[b].CompareTo(totals[a]));
+        if (use.Count > 8)
+            use.RemoveRange(8, use.Count - 8);
+        var maps = new float[ares, ares, use.Count];
+        for (int z = 0; z < ares; z++)
+        for (int x = 0; x < ares; x++)
+        {
+            float sum = 0f;
+            for (int i = 0; i < use.Count; i++)
+                sum += maps[z, x, i] = full[z, x, use[i]];
+            for (int i = 0; i < use.Count; i++)
+                maps[z, x, i] = sum > 0f ? maps[z, x, i] / sum : (i == 0 ? 1f : 0f);
+        }
+        data.terrainLayers = use.ConvertAll(k => layers[k]).ToArray();
+        data.SetAlphamaps(0, 0, maps);
+        data.treeInstances = Array.Empty<TreeInstance>();
+        EditorUtility.SetDirty(data);
+
+        var go = Terrain.CreateTerrainGameObject(data);
+        go.name = name;
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = new Vector3(x0, seaFloor, z0);
+        var terrain = go.GetComponent<Terrain>();
+        var pipeline = GraphicsSettings.currentRenderPipeline;
+        if (pipeline != null && pipeline.defaultTerrainMaterial != null)
+            terrain.materialTemplate = pipeline.defaultTerrainMaterial;
+        terrain.drawInstanced = true;
+        terrain.heightmapPixelError = pixelError;
+        terrain.basemapDistance = 400f;
+        terrain.treeDistance = 900f;
+        terrain.treeBillboardDistance = 900f;
+        terrain.treeMaximumFullLODCount = 2000;
+        terrain.groupingID = 7;
+        terrain.allowAutoConnect = true;
+        return terrain;
+    }
+
+    // Where a point outside the strip takes its land from: mirrored back in across the nearest edge.
+    Vector2 Mirror(float x, float z)
+    {
+        if (x < 0f) x = -x;
+        else if (x > width) x = 2f * width - x;
+        if (z > length) z = 2f * length - z;
+        return new Vector2(Mathf.Clamp(x, 0f, width), Mathf.Clamp(z, 0f, length));
+    }
+
+    float SideOutside(float x) => Mathf.Max(0f, Mathf.Max(-x, x - width));
+
+    float SideFadeAt(float x, float z) => sideFade * (0.6f + 0.8f * Mathf.PerlinNoise(z / 90f + 3.1f, x / 90f + 8.4f));
+
+    /// <summary>Height anywhere: the strip itself, or past its sides and north end the land mirrored back in and,
+    /// past the sides, sinking into the sea.</summary>
+    float WorldHeight(float x, float z)
+    {
+        var m = Mirror(x, z);
+        float h = Height(m.x, m.y);
+        float side = SideOutside(x);
+        if (side > 0f)
+            h = Mathf.Lerp(h, sideLevel, Mathf.SmoothStep(0f, 1f, side / SideFadeAt(x, z)));
+        return h;
+    }
+
+    float[,,] Splat(float x0, float z0, float tw, float tl, int ares, int count)
     {
         var maps = new float[ares, ares, count];
-        float tileLength = length / tiles;
         var w = new float[count];
         for (int az = 0; az < ares; az++)
         for (int ax = 0; ax < ares; ax++)
         {
-            float x = (ax + 0.5f) / ares * width, z = tile * tileLength + (az + 0.5f) / ares * tileLength;
+            float wx = x0 + (ax + 0.5f) / ares * tw, wz = z0 + (az + 0.5f) / ares * tl;
+            bool beyond = wx < 0f || wx > width || wz > length;
+            var mirrored = Mirror(wx, wz);
+            float x = mirrored.x, z = mirrored.y;
             float fx = Mathf.Clamp(x / sx, 0, nx - 1), fz = Mathf.Clamp(z / sz, 0, nz - 1);
             int s = Mathf.RoundToInt(fz) * nx + Mathf.RoundToInt(fx);
-            float h = Bilinear(heights, x, z);
+            float h = beyond ? WorldHeight(wx, wz) : Bilinear(heights, x, z);
             float open = Bilinear(cover[(int)Cover.Open], x, z), broad = Bilinear(cover[(int)Cover.Broadleaf], x, z);
             float pine = Bilinear(cover[(int)Cover.Conifer], x, z), wet = Bilinear(cover[(int)Cover.Wetland], x, z);
             Array.Clear(w, 0, count);
@@ -760,14 +824,14 @@ public class KingdomMapBuilder : ScriptableObject
             Normalise(w);
             // shores: the beach by the sea, the banks of rivers and lakes
             float beach = Mathf.InverseLerp(beachHeight + 0.6f, beachHeight - 0.3f, h)
-                          * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.05f, 0.35f, Bilinear(coast, x, z)));
+                          * (beyond ? 1f : Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.05f, 0.35f, Bilinear(coast, x, z))));
             float riverEdge = riverDistance[s] < float.MaxValue
                 ? Mathf.InverseLerp(riverHalf[s] + 0.9f, riverHalf[s] + 0.1f, riverDistance[s]) : 0f;
             float lakeEdge = lakeOf[s] >= 0 ? 1f : 0f;
             Overlay(w, 7, Mathf.Max(beach, Mathf.Max(riverEdge, lakeEdge)));
             float rocky = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(rockSlope.x, rockSlope.y, Bilinear(slope, x, z)));
             Overlay(w, 8, rocky);
-            float snowy = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(SnowLine(z), SnowLine(z) + snowBlend, h)) * (1f - rocky * 0.55f);
+            float snowy = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(SnowLine(Mathf.Min(wz, length)), SnowLine(Mathf.Min(wz, length)) + snowBlend, h)) * (1f - rocky * 0.55f);
             Overlay(w, 9, snowy);
             for (int k = 0; k < count; k++)
                 maps[az, ax, k] = w[k];
@@ -792,8 +856,13 @@ public class KingdomMapBuilder : ScriptableObject
 
     // ---------------------------------------------------------------- plants
 
+    struct Placed { public Vector3 position; public int prototype; public float scale, rotation; }
+    readonly List<Placed> placed = new List<Placed>();
+    TreePrototype[] treePrototypes;
+
     int Plant(Terrain[] terrains)
     {
+        placed.Clear();
         var prototypes = new List<TreePrototype>();
         var protoIndex = new Dictionary<GameObject, int>();
         foreach (var set in scatter)
@@ -865,13 +934,14 @@ public class KingdomMapBuilder : ScriptableObject
                     color = Color.white,
                     lightmapColor = Color.white,
                 });
+                placed.Add(new Placed { position = new Vector3(px, h, pz), prototype = protoIndex[prefabs[pick]], scale = scale, rotation = turn });
                 total++;
             }
         }
         for (int t = 0; t < tiles; t++)
         {
             var data = terrains[t].terrainData;
-            data.treePrototypes = prototypes.ToArray();
+            data.treePrototypes = treePrototypes = prototypes.ToArray();
             data.RefreshPrototypes();
             data.SetTreeInstances(perTile[t].ToArray(), true);
             EditorUtility.SetDirty(data);
@@ -894,7 +964,7 @@ public class KingdomMapBuilder : ScriptableObject
         // the sea: one plane at sea level, well past the edges so the land fades out over water
         // a grid rather than one huge quad: Flat Kit's depth and foam went wrong across triangles kilometres wide
         var sea = new Mesh { name = "Sea", indexFormat = IndexFormat.UInt32 };
-        float pad = 800f, cell = 32f;
+        float pad = edges == EdgeStyle.Diorama ? 0f : 800f, cell = 32f;
         int cx = Mathf.CeilToInt((width + pad * 2) / cell), cz = Mathf.CeilToInt((length + pad * 2) / cell);
         var seaVerts = new List<Vector3>();
         var seaTris = new List<int>();
@@ -915,7 +985,7 @@ public class KingdomMapBuilder : ScriptableObject
         holder = sea;
         AddWater(waterRoot, null, sea, "Sea");
         count++;
-        if (seaFloorMaterial != null)
+        if (seaFloorMaterial != null && edges != EdgeStyle.Diorama)
         {
             var floor = new Mesh { name = "Sea Floor" };
             float y = seaFloor + 0.3f;
@@ -999,6 +1069,255 @@ public class KingdomMapBuilder : ScriptableObject
         }
         AssetDatabase.SaveAssets();
         return count;
+    }
+
+    // ---------------------------------------------------------------- edges: haze
+
+    /// <summary>Land past the sides and the north end, mirrored from the strip, the sides sinking into the sea; the
+    /// strip's plants mirrored onto it, thinning out; and a mist over everything outside the strip.</summary>
+    void MakeHazeEdges(GameObject root, Terrain[] main)
+    {
+        var beyond = new GameObject("Beyond");
+        beyond.transform.SetParent(root.transform, false);
+        var layers = Layers();
+        int res = heightmapResolution, ares = Mathf.Max(64, alphamapResolution / 2);
+        float tileLength = length / tiles, m = sideMargin;
+        var grid = new Dictionary<Vector2Int, Terrain>();
+        for (int t = 0; t < tiles; t++)
+            grid[new Vector2Int(0, t)] = main[t];
+        void Tile(int col, int row, string name)
+        {
+            float x0 = col < 0 ? -m : col == 0 ? 0f : width, w = col == 0 ? width : m;
+            float z0 = row * tileLength;
+            grid[new Vector2Int(col, row)] = CreateTile(beyond.transform, name, "Kingdom Beyond " + name, x0, z0, w, tileLength, res, ares,
+                (x, z) => WorldHeight(x0 + x / (float)(res - 1) * w, z0 + z / (float)(res - 1) * tileLength), layers, 8f);
+        }
+        for (int t = 0; t < tiles; t++)
+        {
+            Tile(-1, t, $"West {t + 1}");
+            Tile(1, t, $"East {t + 1}");
+        }
+        Tile(-1, tiles, "North West");
+        Tile(0, tiles, "North");
+        Tile(1, tiles, "North East");
+        Terrain At(int c, int r) => grid.TryGetValue(new Vector2Int(c, r), out var found) ? found : null;
+        foreach (var kv in grid)
+            kv.Value.SetNeighbors(At(kv.Key.x - 1, kv.Key.y), At(kv.Key.x, kv.Key.y + 1), At(kv.Key.x + 1, kv.Key.y), At(kv.Key.x, kv.Key.y - 1));
+
+        // the strip's plants, mirrored across the nearest edges, thinning out as the land sinks
+        var perTile = new Dictionary<Terrain, List<TreeInstance>>();
+        var rng = new Random(seed + 7);
+        foreach (var plant in placed)
+        {
+            float px = plant.position.x, pz = plant.position.z;
+            float mx = px < m ? -px : px > width - m ? 2f * width - px : float.NaN;
+            float mz = pz > length - tileLength ? 2f * length - pz : float.NaN;
+            var copies = new List<Vector2>();
+            if (!float.IsNaN(mx)) copies.Add(new Vector2(mx, pz));
+            if (!float.IsNaN(mz)) copies.Add(new Vector2(px, mz));
+            if (!float.IsNaN(mx) && !float.IsNaN(mz)) copies.Add(new Vector2(mx, mz));
+            foreach (var c in copies)
+            {
+                if (WorldHeight(c.x, c.y) < 0.5f)
+                    continue;
+                float side = SideOutside(c.x);
+                if (side > 0f && rng.NextDouble() < Mathf.SmoothStep(0f, 1f, side / SideFadeAt(c.x, c.y)))
+                    continue;
+                var tile = At(c.x < 0f ? -1 : c.x > width ? 1 : 0, Mathf.Min((int)(c.y / tileLength), tiles));
+                if (tile == null || Array.IndexOf(main, tile) >= 0)
+                    continue;
+                if (!perTile.TryGetValue(tile, out var list))
+                    perTile[tile] = list = new List<TreeInstance>();
+                var o = tile.transform.localPosition;
+                var size = tile.terrainData.size;
+                list.Add(new TreeInstance
+                {
+                    position = new Vector3((c.x - o.x) / size.x, 0f, (c.y - o.z) / size.z),
+                    prototypeIndex = plant.prototype,
+                    widthScale = plant.scale,
+                    heightScale = plant.scale,
+                    rotation = -plant.rotation,
+                    color = Color.white,
+                    lightmapColor = Color.white,
+                });
+            }
+        }
+        foreach (var kv in perTile)
+        {
+            var data = kv.Key.terrainData;
+            data.treePrototypes = treePrototypes;
+            data.RefreshPrototypes();
+            data.SetTreeInstances(kv.Value.ToArray(), true);
+            EditorUtility.SetDirty(data);
+        }
+
+        // the mist: a flat bank in the fog's colour, clear over the strip and thickening past its edges
+        if (hazeMaterial != null)
+        {
+            var xs = Axis(-1400f, width + 1400f, 0f, width);
+            var zs = Axis(-1400f, length + 1400f, 0f, length);
+            var verts = new List<Vector3>();
+            var colours = new List<Color>();
+            var tris = new List<int>();
+            var colour = RenderSettings.fogColor.linear;
+            foreach (float z in zs)
+            foreach (float x in xs)
+            {
+                float outside = Mathf.Max(0f, Mathf.Max(Mathf.Max(-x, x - width), Mathf.Max(z - length, -z)));
+                verts.Add(new Vector3(x, 0f, z));
+                colour.a = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(hazeDistance.x, hazeDistance.y, outside));
+                colours.Add(colour);
+            }
+            int row = xs.Count;
+            for (int j = 0; j + 1 < zs.Count; j++)
+            for (int i = 0; i + 1 < row; i++)
+            {
+                int a = j * row + i;
+                if (colours[a].a + colours[a + 1].a + colours[a + row].a + colours[a + row + 1].a <= 0f)
+                    continue;
+                tris.AddRange(new[] { a, a + row, a + 1, a + 1, a + row, a + row + 1 });
+            }
+            var mesh = new Mesh { name = "Haze", indexFormat = IndexFormat.UInt32 };
+            mesh.SetVertices(verts);
+            mesh.SetColors(colours);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            string path = $"{outputFolder}/Kingdom Edges.asset";
+            AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(mesh, path);
+            var go = new GameObject("Haze");
+            go.transform.SetParent(root.transform, false);
+            go.transform.localPosition = new Vector3(0f, hazeHeight, 0f);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = hazeMaterial;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+        AssetDatabase.SaveAssets();
+    }
+
+    /// <summary>Grid lines from lo to hi: fine near the strip (from start to end, with a margin), coarse further out.</summary>
+    static List<float> Axis(float lo, float hi, float start, float end)
+    {
+        var values = new List<float>();
+        float nearLo = start - 160f, nearHi = end + 160f;
+        for (float v = lo; v < nearLo; v += 60f) values.Add(v);
+        for (float v = nearLo; v < nearHi; v += 6f) values.Add(v);
+        for (float v = nearHi; v < hi; v += 60f) values.Add(v);
+        values.Add(hi);
+        return values;
+    }
+
+    // ---------------------------------------------------------------- edges: diorama
+
+    /// <summary>The strip as a block: layered earth sides down to a base, a cut face where sea, river or lake water
+    /// meets the edge, and a table under it all.</summary>
+    void MakeDioramaEdges(GameObject root)
+    {
+        // the outline, anticlockwise seen from above, a point every metre
+        var outline = new List<Vector2>();
+        for (float x = 0; x < width; x += 1f) outline.Add(new Vector2(x, 0f));
+        for (float z = 0; z < length; z += 1f) outline.Add(new Vector2(width, z));
+        for (float x = width; x > 0f; x -= 1f) outline.Add(new Vector2(x, length));
+        for (float z = length; z > 0f; z -= 1f) outline.Add(new Vector2(0f, z));
+        outline.Add(outline[0]);
+
+        var verts = new List<Vector3>();
+        var colours = new List<Color>();
+        var tris = new List<int>();
+        void Quad(Vector2 a, Vector2 b, float aTop, float bTop, float aBottom, float bBottom, Color aTopColour, Color bTopColour, Color aBottomColour, Color bBottomColour)
+        {
+            if (aTop - aBottom < 0.01f && bTop - bBottom < 0.01f)
+                return;
+            int k = verts.Count;
+            verts.Add(new Vector3(a.x, aTop, a.y)); verts.Add(new Vector3(b.x, bTop, b.y));
+            verts.Add(new Vector3(a.x, aBottom, a.y)); verts.Add(new Vector3(b.x, bBottom, b.y));
+            colours.Add(aTopColour); colours.Add(bTopColour); colours.Add(aBottomColour); colours.Add(bBottomColour);
+            tris.AddRange(new[] { k, k + 1, k + 2, k + 1, k + 3, k + 2 }); // clockwise seen from outside
+        }
+        // band colours: grass lip, topsoil, clay, stone, bedrock; sand instead of grass under water
+        var grassLip = new Color(0.33f, 0.42f, 0.17f);
+        var sand = new Color(0.62f, 0.55f, 0.40f);
+        var bandColours = new[] { new Color(0.30f, 0.21f, 0.14f), new Color(0.47f, 0.34f, 0.22f), new Color(0.50f, 0.46f, 0.40f), new Color(0.34f, 0.33f, 0.32f) };
+        float along = 0f;
+        float[] Levels(Vector2 p, float ground, float at)
+        {
+            float lip = ground - 0.6f;
+            float soil = Mathf.Min(lip, -1.2f + Mathf.PerlinNoise(at / 23f, 1.3f) * 1.6f);
+            float clay = Mathf.Min(soil, -5f + Mathf.PerlinNoise(at / 31f, 7.7f) * 2.2f);
+            float stone = Mathf.Min(clay, -9.5f + Mathf.PerlinNoise(at / 19f, 4.2f) * 2.5f);
+            return new[] { ground, lip, soil, clay, stone, dioramaBase };
+        }
+        float Shade(float at, int band) => 0.88f + 0.24f * Mathf.PerlinNoise(at / 6f, band * 3.7f);
+        Color Times(Color c, float f) => new Color(c.r * f, c.g * f, c.b * f, 1f);
+        float WaterAt(Vector2 p, float ground)
+        {
+            float level = ground < 0f ? 0f : float.MinValue;
+            int s = Mathf.RoundToInt(Mathf.Clamp(p.y / sz, 0, nz - 1)) * nx + Mathf.RoundToInt(Mathf.Clamp(p.x / sx, 0, nx - 1));
+            if (riverDistance[s] < riverHalf[s])
+                level = Mathf.Max(level, riverSurface[s]);
+            if (lakeOf[s] >= 0)
+                level = Mathf.Max(level, LakeSurface(lakeOf[s]));
+            return level;
+        }
+        var waterTop = new Color(0.22f, 0.46f, 0.52f);
+        var waterDeep = new Color(0.05f, 0.16f, 0.24f);
+        for (int i = 0; i + 1 < outline.Count; i++)
+        {
+            Vector2 a = outline[i], b = outline[i + 1];
+            float atA = along, atB = along + Vector2.Distance(a, b);
+            along = atB;
+            float ga = Bilinear(heights, a.x, a.y), gb = Bilinear(heights, b.x, b.y);
+            var la = Levels(a, ga, atA);
+            var lb = Levels(b, gb, atB);
+            // the top band: grass on land, sand under water
+            var ca = Times(ga < 0.2f ? sand : grassLip, Shade(atA, 0));
+            var cb = Times(gb < 0.2f ? sand : grassLip, Shade(atB, 0));
+            Quad(a, b, la[0], lb[0], la[1], lb[1], ca, cb, ca, cb);
+            for (int band = 1; band < 5; band++)
+            {
+                var c1 = Times(bandColours[band - 1], Shade(atA, band));
+                var c2 = Times(bandColours[band - 1], Shade(atB, band));
+                Quad(a, b, la[band], lb[band], la[band + 1], lb[band + 1], c1, c2, c1, c2);
+            }
+            // water standing above the ground at the edge: its cut face, light at the top, dark below
+            float wa = WaterAt(a, ga), wb = WaterAt(b, gb);
+            if (wa > ga || wb > gb)
+            {
+                float ta = Mathf.Max(wa, ga), tb = Mathf.Max(wb, gb);
+                Color Depth(float top, float y) => Color.Lerp(waterTop, waterDeep, Mathf.InverseLerp(0f, 8f, top - y));
+                Quad(a, b, ta, tb, ga, gb, waterTop, waterTop, Depth(ta, ga), Depth(tb, gb));
+            }
+        }
+        var mesh = new Mesh { name = "Diorama Sides", indexFormat = IndexFormat.UInt32 };
+        mesh.SetVertices(verts);
+        mesh.SetColors(colours);
+        mesh.SetTriangles(tris, 0);
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        string path = $"{outputFolder}/Kingdom Edges.asset";
+        AssetDatabase.DeleteAsset(path);
+        AssetDatabase.CreateAsset(mesh, path);
+        var sides = new GameObject("Diorama Sides");
+        sides.transform.SetParent(root.transform, false);
+        sides.AddComponent<MeshFilter>().sharedMesh = mesh;
+        sides.AddComponent<MeshRenderer>().sharedMaterial = dioramaSideMaterial;
+
+        // the table the block stands on
+        var table = new Mesh { name = "Table" };
+        float pad = 3000f, y = dioramaBase - 0.02f;
+        table.vertices = new[] { new Vector3(-pad, y, -pad), new Vector3(width + pad, y, -pad), new Vector3(-pad, y, length + pad), new Vector3(width + pad, y, length + pad) };
+        table.triangles = new[] { 0, 2, 1, 1, 2, 3 };
+        table.RecalculateNormals();
+        table.RecalculateBounds();
+        AssetDatabase.AddObjectToAsset(table, mesh);
+        var tableObject = new GameObject("Table");
+        tableObject.transform.SetParent(root.transform, false);
+        tableObject.AddComponent<MeshFilter>().sharedMesh = table;
+        tableObject.AddComponent<MeshRenderer>().sharedMaterial = dioramaTableMaterial;
+        AssetDatabase.SaveAssets();
     }
 
     void AddWater(GameObject parent, Mesh holder, Mesh mesh, string name)

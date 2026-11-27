@@ -179,6 +179,16 @@ MonoBehaviour:
   snowBlend: 6
   beachHeight: 0.9
   beachWidth: 6
+  edges: 0
+  sideMargin: 128
+  sideFade: 75
+  sideLevel: -3
+  hazeDistance: {x: 8, y: 95}
+  hazeHeight: 2.5
+  hazeMaterial: {fileID: 2100000, guid: 2e3d93d81f76f3c48873255cf7f4904e, type: 2}
+  dioramaBase: -18
+  dioramaSideMaterial: {fileID: 2100000, guid: 74e277c25d1934f4bbdd02d8ce02d1b4, type: 2}
+  dioramaTableMaterial: {fileID: 2100000, guid: a9fe9a01e74c8b745b308eb7317cd52a, type: 2}
   scatter:
   - name: Broadleaf trees
     prefabs:
