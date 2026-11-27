@@ -1,13 +1,17 @@
+using System;
 using System.Collections.Generic;
 using DamageNumbersPro;
 using MoreMountains.Feedbacks;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Random = UnityEngine.Random;
 
 /// <summary>
 /// Runs a <see cref="BattleSim"/> in the scene: spawns a figure for every unit, moves them as the battle plays,
-/// flies the arrows and logs the result. Enter starts another battle with the same armies.
+/// flies the arrows and logs the result. In the battle scene Enter starts another battle with the same armies; on the
+/// map a <see cref="BattleLink"/> hands it the armies from trading (<see cref="Begin(IList{ArmyEntry}, IList{ArmyEntry})"/>)
+/// and waits for <see cref="Finished"/>.
 /// The feel: Feel (More Mountains), driven from code, for slow motion and freeze frames (MMTimeManager) and a scale
 /// spring on every figure that squashes when it's hit; Cinemachine impulses for the camera's jolts, which push along
 /// the blow; and a closer Cinemachine camera that the view cuts to for big moments.
@@ -41,6 +45,8 @@ public class BattleView : MonoBehaviour
     [Tooltip("Battle seconds per real second.")]
     [SerializeField, Min(0f)] float speed = 1f;
     [SerializeField] bool startOnPlay = true;
+    [Tooltip("Enter starts another battle. Off on the map, where trading decides when battles happen.")]
+    [SerializeField] bool enterRestarts = true;
 
     [Header("Camera")]
     [Tooltip("Every living unit is kept in this group, so a Cinemachine camera following it frames the fight. Optional.")]
@@ -219,6 +225,9 @@ public class BattleView : MonoBehaviour
     /// <summary>The battle being shown, or null before the first one.</summary>
     public BattleSim Sim => sim;
 
+    /// <summary>The battle has ended: the winning side (0, 1) or <see cref="BattleSim.Draw"/>.</summary>
+    public event Action<int> Finished;
+
     void Awake()
     {
         upperBodyMask = new AvatarMask { name = "Battle Upper Body" };
@@ -334,7 +343,7 @@ public class BattleView : MonoBehaviour
     void Update()
     {
         var keyboard = Keyboard.current;
-        if (keyboard != null && !GameInput.Blocked
+        if (enterRestarts && keyboard != null && !GameInput.Blocked
             && (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame))
             Begin();
         if (sim == null)
@@ -360,7 +369,52 @@ public class BattleView : MonoBehaviour
             reported = true;
             Debug.Log("[Battle] " + sim.Describe());
             Play(battleEndClip);
+            Finished?.Invoke(sim.Winner);
         }
+    }
+
+    /// <summary>Starts a battle between these armies (side A is the player's, side B the enemy's).</summary>
+    public void Begin(IList<ArmyEntry> a, IList<ArmyEntry> b)
+    {
+        armyA = new List<ArmyEntry>(a);
+        armyB = new List<ArmyEntry>(b);
+        Begin();
+    }
+
+    /// <summary>The living units of a side, counted by type.</summary>
+    public List<ArmyEntry> Survivors(int side)
+    {
+        var counts = new List<ArmyEntry>();
+        if (sim == null)
+            return counts;
+        foreach (var unit in sim.units)
+        {
+            if (unit.side != side || !unit.Alive)
+                continue;
+            int i = counts.FindIndex(e => e.type == unit.type);
+            if (i < 0) counts.Add(new ArmyEntry(unit.type, 1));
+            else counts[i] = new ArmyEntry(unit.type, counts[i].count + 1);
+        }
+        return counts;
+    }
+
+    /// <summary>Takes every figure and arrow off the field and stops the battle.</summary>
+    public void Clear()
+    {
+        DisposeAnimations();
+        if (figureRoot != null)
+            Destroy(figureRoot.gameObject);
+        figureRoot = null;
+        figures.Clear();
+        arrows.Clear();
+        if (cameraGroup != null)
+            cameraGroup.Targets.Clear();
+        if (momentCamera != null)
+            momentCamera.enabled = false;
+        if (dust != null) dust.Clear();
+        if (hits != null) hits.Clear();
+        MMTimeScaleEvent.Trigger(MMTimeScaleMethods.Reset, 1f, 0f, false, 0f, false);
+        sim = null;
     }
 
     /// <summary>Clears the field and starts a new battle with the armies set in the Inspector.</summary>
@@ -398,13 +452,16 @@ public class BattleView : MonoBehaviour
         if (dust != null) dust.Clear();
         if (hits != null) hits.Clear();
 
-        int battleSeed = seed != 0 ? seed : Random.Range(1, int.MaxValue);
+        int battleSeed = seed != 0 ? seed : UnityEngine.Random.Range(1, int.MaxValue);
         var zones = TerrainZones();
         var land = ground != null && ground.isActiveAndEnabled ? ground
             : terrainRoot != null ? terrainRoot.GetComponentInChildren<Terrain>(false) : null;
         System.Func<Vector2, float> heightAt = null;
         if (land != null)
             heightAt = point => land.SampleHeight(transform.TransformPoint(new Vector3(point.x, 0f, point.y))) + land.transform.position.y - transform.position.y;
+        else if (ground == null && terrainRoot == null && Terrain.activeTerrains.Length > 0)
+            // on the map: whichever of its terrain tiles is under the point
+            heightAt = point => GroundHeight(transform.TransformPoint(new Vector3(point.x, 0f, point.y))) - transform.position.y;
         sim = new BattleSim(armyA, armyB, Zone(spawnA), Zone(spawnB), FieldBounds(), battleSeed, simSettings, zones, armyAHolds, armyBHolds, heightAt);
         Debug.Log("[Battle] started with seed " + battleSeed + ", " + sim.units.Count + " units, " + zones.Count + " terrain zones");
         foreach (var unit in sim.units)
@@ -419,6 +476,19 @@ public class BattleView : MonoBehaviour
             foreach (var figure in figures)
                 cameraGroup.AddMember(figure.root, 1f, cameraUnitRadius);
         }
+    }
+
+    /// <summary>The height of the active terrain tile under a world point, or the view's own height off every tile.</summary>
+    float GroundHeight(Vector3 world)
+    {
+        foreach (var tile in Terrain.activeTerrains)
+        {
+            var corner = tile.transform.position;
+            var size = tile.terrainData.size;
+            if (world.x >= corner.x && world.x <= corner.x + size.x && world.z >= corner.z && world.z <= corner.z + size.z)
+                return tile.SampleHeight(world) + corner.y;
+        }
+        return transform.position.y;
     }
 
     Rect Zone(Transform centre)

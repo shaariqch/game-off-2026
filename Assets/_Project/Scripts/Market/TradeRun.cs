@@ -89,7 +89,12 @@ public class TradeRun : MonoBehaviour
     [Tooltip("Cash to scout one enemy unit type, which shows how many of it the enemy has.")]
     [SerializeField, Min(0)] int scoutPrice = 15;
 
-    [Header("Enemy (placeholder until battles are joined up)")]
+    [Header("Battles")]
+    [Tooltip("Cash for a win, as a share of what the enemy army was worth at cost. The design: a normal win pays " +
+             "about enough to buy back what was lost, so a win with few losses comes out well ahead.")]
+    [SerializeField, Min(0f)] float winPay = 0.5f;
+
+    [Header("Enemy (placeholder: random types sharing a worth)")]
     [Tooltip("What the enemy army is worth at the first battle, and what each later battle adds, in unit cost.")]
     [SerializeField] Vector2 enemyWorth = new Vector2(240f, 120f);
     [Tooltip("How many unit types the enemy brings, at least and at most.")]
@@ -144,6 +149,14 @@ public class TradeRun : MonoBehaviour
     public event Action<Side, KeyMoment, int> KeyMoved;
     /// <summary>A tip has revealed an event still to come.</summary>
     public event Action<MarketEvent> Tipped;
+    /// <summary>The timeline has reached the battle. Whoever fights it calls <see cref="EndBattle"/> afterwards.
+    /// With no one listening, Enter skips the battle.</summary>
+    public event Action BattleReached;
+    /// <summary>A battle has been fought: won or not, and the cash it paid.</summary>
+    public event Action<bool, int> BattleEnded;
+
+    /// <summary>A battle is being fought on the map (trading has stopped and someone took the battle).</summary>
+    public bool Fighting { get; private set; }
 
     int[] held;
     int runSeed;
@@ -193,6 +206,7 @@ public class TradeRun : MonoBehaviour
     {
         PhaseTime = 0f;
         AtBattle = false;
+        Fighting = false;
         Reset(buy);
         Reset(sell);
         revealed.Clear();
@@ -252,10 +266,10 @@ public class TradeRun : MonoBehaviour
 
         if (AtBattle)
         {
-            if (input && (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame))
+            if (!Fighting && input && (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame))
             {
-                // placeholder until battles are joined up: the battle is skipped
-                Debug.Log($"[Trade] battle {Battle} skipped (not joined up yet)");
+                // with nothing in the scene to fight it, the battle is skipped
+                Debug.Log($"[Trade] battle {Battle} skipped (no battle in the scene)");
                 if (Battle >= battlesPerRun) NewRun();
                 else
                 {
@@ -298,7 +312,9 @@ public class TradeRun : MonoBehaviour
             Complete(sell);
             AtBattle = true;
             Play(battleClip);
+            Fighting = BattleReached != null;
             Debug.Log($"[Trade] battle {Battle} reached with cash {Cash}, army {ArmyText()}");
+            BattleReached?.Invoke();
         }
     }
 
@@ -520,6 +536,69 @@ public class TradeRun : MonoBehaviour
         order.count = 0;
         order.capped = false;
         order.heldFor = order.countDebt = order.countdownLeft = 0f;
+    }
+
+    /// <summary>The army held, as battle entries.</summary>
+    public List<ArmyEntry> Army()
+    {
+        var army = new List<ArmyEntry>();
+        for (int i = 0; i < held.Length; i++)
+            if (held[i] > 0) army.Add(new ArmyEntry(Unit(i), held[i]));
+        return army;
+    }
+
+    /// <summary>The coming battle's enemy army.</summary>
+    public List<ArmyEntry> EnemyArmy()
+    {
+        var army = new List<ArmyEntry>();
+        foreach (var group in enemy)
+            army.Add(new ArmyEntry(group.type, group.count));
+        return army;
+    }
+
+    /// <summary>What the enemy army is worth at cost.</summary>
+    public int EnemyWorth()
+    {
+        int worth = 0;
+        foreach (var group in enemy)
+            worth += group.count * group.type.cost;
+        return worth;
+    }
+
+    /// <summary>
+    /// After a battle: the survivors are the army now. A win pays cash and trading starts towards the next battle
+    /// (or, after the last, a new run); a loss ends the run.
+    /// </summary>
+    public void EndBattle(IList<ArmyEntry> survivors, bool won)
+    {
+        if (!AtBattle)
+            return;
+        for (int i = 0; i < held.Length; i++)
+            held[i] = 0;
+        foreach (var entry in survivors)
+        {
+            int index = Market.IndexOf(entry.type);
+            if (index >= 0) held[index] += entry.count;
+        }
+        int pay = won ? Mathf.RoundToInt(EnemyWorth() * winPay) : 0;
+        Cash += pay;
+        Debug.Log($"[Trade] battle {Battle} {(won ? "won" : "lost")}, paid {pay}, army now {ArmyText()}, cash {Cash}");
+        BattleEnded?.Invoke(won, pay);
+        if (!won)
+        {
+            Debug.Log("[Trade] the run is over");
+            NewRun();
+        }
+        else if (Battle >= battlesPerRun)
+        {
+            Debug.Log("[Trade] every battle won: the run is over");
+            NewRun();
+        }
+        else
+        {
+            Battle++;
+            StartPhase();
+        }
     }
 
     string ArmyText()

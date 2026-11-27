@@ -577,3 +577,13 @@
     font-size: 14px;
     -unity-text-align: middle-center;
 }
+
+/* a battle fought on the map has the screen to itself */
+#hud {
+    transition-property: opacity;
+    transition-duration: 0.5s;
+}
+
+#hud.hud--fighting {
+    opacity: 0;
+}

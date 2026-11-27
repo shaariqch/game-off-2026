@@ -439,4 +439,9 @@ MonoBehaviour:
       - {x: 211, y: 496}
       - {x: 218, y: 492}
       width: 3
+  - name: 'Battlefield: Millbrook East'
+    centre: {x: 223, y: 464}
+    radius: 32
+    level: 0.5
+    roads: []
   road: {fileID: 8574412962073106934, guid: 224d63e1442241943b8cafe00b71bdbd, type: 2}

@@ -353,6 +353,8 @@ public class TradeHud : MonoBehaviour
             BuildRows();
 
         hud.EnableInClassList("hud--battle", run.AtBattle);
+        // a battle fought on the map has the screen to itself
+        hud.EnableInClassList("hud--fighting", run.Fighting);
         cashValue.text = run.Cash.ToString();
 
         float progress = Mathf.Clamp01(run.PhaseTime / run.PhaseLength);
