@@ -3638,11 +3638,11 @@ PrefabInstance:
     - target: {fileID: 510582517403770391, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: 'ambienceProfiles.Array.data[1]'
       value: 
-      objectReference: {fileID: 11400000, guid: b7c8b67560198f24a9ca2339b63e609d, type: 2}
+      objectReference: {fileID: 11400000, guid: 5dc11c2b7577bd44e9aa249a7a86b421, type: 2}
     - target: {fileID: 510582517403770391, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: 'ambienceProfiles.Array.data[2]'
       value: 
-      objectReference: {fileID: 11400000, guid: a337c6da8b322cb4a832bc74cdf1ed16, type: 2}
+      objectReference: {fileID: 11400000, guid: 2a460277653234a42939772f9ec99c6e, type: 2}
     - target: {fileID: 1034506217739268588, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: InitialModule.startColor.maxColor.b
       value: 0.85189235
@@ -4061,6 +4061,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6948066750454693060, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 666695210}
+    - targetCorrespondingSourceObject: {fileID: 6948066750454693060, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 666695211}
   m_SourcePrefab: {fileID: 100100000, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
 --- !u!1 &666695205 stripped
 GameObject:
@@ -4114,6 +4117,54 @@ MonoBehaviour:
   - Thunder
   - Hail
   - Dust Storm
+--- !u!114 &666695211
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 666695205}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4e87f2831608fa4096cd2c0d6ae19bd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MapStorm
+  darkness:
+  - weather: Thunder Storm
+    amount: 1
+  - weather: Imminent Storm
+    amount: 0.85
+  - weather: Hail Storm
+    amount: 0.8
+  - weather: Heavy Precipitation
+    amount: 0.6
+  - weather: Dust Storm
+    amount: 0.5
+  - weather: Storm Eye
+    amount: 0.45
+  - weather: Approaching Storm
+    amount: 0.45
+  - weather: Receeding Storm
+    amount: 0.45
+  - weather: Overcast
+    amount: 0.35
+  - weather: Dense Fog
+    amount: 0.35
+  - weather: Distant Storm
+    amount: 0.3
+  - weather: Dense Clouds
+    amount: 0.3
+  - weather: Light Precipitation
+    amount: 0.3
+  - weather: Mostly Cloudy
+    amount: 0.15
+  exposure: -1.1
+  saturation: -35
+  contrast: 8
+  tint: {r: 0.78, g: 0.84, b: 0.98, a: 1}
+  fadeSpeed: 0.25
+  flash: 1.6
+  flashTime: 0.35
 --- !u!1001 &675556830
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -8312,6 +8363,7 @@ GameObject:
   - component: {fileID: 1491646144}
   - component: {fileID: 1491646143}
   - component: {fileID: 1491646146}
+  - component: {fileID: 1491646147}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -8444,6 +8496,14 @@ MonoBehaviour:
   speed: 140
   easing: 0.12
   zRange: {x: -90, y: 520}
+--- !u!81 &1491646147
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1491646142}
+  m_Enabled: 1
 --- !u!1001 &1500181743
 PrefabInstance:
   m_ObjectHideFlags: 0
