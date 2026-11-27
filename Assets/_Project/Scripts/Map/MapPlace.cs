@@ -8,7 +8,7 @@ public class MapPlace : MonoBehaviour
 
     public static MapPlace Find(string name)
     {
-        foreach (var place in FindObjectsByType<MapPlace>(FindObjectsSortMode.None))
+        foreach (var place in FindObjectsByType<MapPlace>())
             if (place.placeName == name)
                 return place;
         return null;
