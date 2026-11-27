@@ -7,10 +7,11 @@ using UnityEngine;
 /// drift. No graphics, so it can be run from an eval.
 /// </summary>
 /// <remarks>
-/// Each type's price is its cost times a factor. The factor is pulled back towards a target (1, plus whatever the
-/// running events add), so a price that buying pushed up drifts back down over time. An event's push rises over
-/// <see cref="Settings.eventRise"/> seconds, then fades over <see cref="Settings.eventFade"/>: quick to move, slow
-/// to settle, as the design asks.
+/// Each type's price is its cost times a factor plus whatever the running events add. The factor is pulled back
+/// towards 1, so a price that the player's buying pushed up drifts back down over time. An event's push goes straight
+/// onto the price: it rises over <see cref="Settings.eventRise"/> seconds, then fades over
+/// <see cref="Settings.eventFade"/>, quick to move and slow to settle, as the design asks. (When the push only moved
+/// the target the factor was pulled towards, the pull's lag kept a +50 % event to about +25 %, reached late.)
 /// </remarks>
 public sealed class Market
 {
@@ -21,7 +22,7 @@ public sealed class Market
         public float buyImpact;
         [Tooltip("How far one unit sold lowers its type's price factor.")]
         public float sellImpact;
-        [Tooltip("How fast a price factor returns to its target, per second (0.05 closes about 5 % of the gap a second).")]
+        [Tooltip("How fast the player's own effect on a price wears off, per second (0.05 closes about 5 % of the gap a second). Events don't go through this.")]
         public float pull;
         [Tooltip("Random wander of the price factor, per square root of a second.")]
         public float drift;
@@ -50,13 +51,18 @@ public sealed class Market
     public sealed class Listing
     {
         public UnitType type;
+        /// <summary>The price factor without events: moved by trading and drift, pulled back towards 1.</summary>
         public float factor = 1f;
-        /// <summary>What running events add to the target factor right now.</summary>
+        /// <summary>What running events add to the price factor right now.</summary>
         public float eventPush;
+        internal Vector2 range;
+
+        /// <summary>The price factor with events, as the price uses it.</summary>
+        public float Total => Mathf.Clamp(factor + eventPush, range.x, range.y);
         /// <summary>Prices at past moments, oldest first, for the trend.</summary>
         internal readonly Queue<(float time, int price)> history = new Queue<(float, int)>();
 
-        public int Price => Mathf.Max(1, Mathf.RoundToInt(type.cost * factor));
+        public int Price => Mathf.Max(1, Mathf.RoundToInt(type.cost * Total));
         /// <summary>1 rising, -1 falling, 0 level, compared with the trend window ago.</summary>
         public int Trend { get; internal set; }
     }
@@ -79,7 +85,7 @@ public sealed class Market
         random = new System.Random(seed);
         foreach (var type in types)
             if (type != null)
-                listings.Add(new Listing { type = type });
+                listings.Add(new Listing { type = type, range = settings.factorRange });
     }
 
     public Listing this[int index] => listings[index];
@@ -129,9 +135,9 @@ public sealed class Market
 
         foreach (var listing in listings)
         {
-            float target = 1f + listing.eventPush;
+            listing.range = settings.factorRange;
             // the gap closes by a share per second whatever the frame rate
-            listing.factor += (target - listing.factor) * (1f - Mathf.Exp(-settings.pull * dt));
+            listing.factor += (1f - listing.factor) * (1f - Mathf.Exp(-settings.pull * dt));
             listing.factor += settings.drift * Mathf.Sqrt(dt) * Gaussian();
             listing.factor = Mathf.Clamp(listing.factor, settings.factorRange.x, settings.factorRange.y);
 
@@ -179,7 +185,8 @@ public sealed class Market
         int count = 0, spent = 0;
         while (count < 999)
         {
-            int price = Mathf.Max(1, Mathf.RoundToInt(listing.type.cost * factor));
+            float total = Mathf.Clamp(factor + listing.eventPush, settings.factorRange.x, settings.factorRange.y);
+            int price = Mathf.Max(1, Mathf.RoundToInt(listing.type.cost * total));
             if (spent + price > cash) break;
             spent += price;
             count++;
