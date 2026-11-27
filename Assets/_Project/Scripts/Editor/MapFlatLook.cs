@@ -435,6 +435,13 @@ public class MapFlatLook : ScriptableObject
         // leaves and cards are single planes seen from both sides
         copy.SetFloat("_Cull", foliage ? 0f : 2f);
         copy.renderQueue = clip ? 2450 : -1;
+        // windows can glow at night: emission on, black until TownLights sets it per renderer
+        if (source.name.StartsWith("Glass"))
+        {
+            copy.EnableKeyword("_EMISSION");
+            copy.SetColor("_EmissionColor", Color.black);
+            copy.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+        }
         copy.enableInstancing = true;
         EditorUtility.SetDirty(copy);
         return copy;

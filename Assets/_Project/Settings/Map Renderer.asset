@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 770acbaed70db4ad696458511aa3f084, type: 3}
   m_Name: Flat Kit Fog
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::FlatKit.FlatKitFog
-  m_Active: 1
+  m_Active: 0
   settings: {fileID: 11400000, guid: 8743e6c4fa3e02e4fb08fc35ff48c551, type: 2}
 --- !u!114 &-459481306098085544
 MonoBehaviour:

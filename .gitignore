@@ -169,6 +169,7 @@ crashlytics-build.properties
 
 # Purchased Asset Store packages that install under Packages/ instead of Assets/
 /[Pp]ackages/dev.ameye.linework/
+/[Pp]ackages/com.distantlands.cozy.core/
 
 # Design references (generated maps and their exports, which include Azgaar's bundled fonts and icons)
 /[Dd]esign/
