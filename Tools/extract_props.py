@@ -54,6 +54,10 @@ JOBS = {
         r"re:PolygonFantasyKingdom/Prefabs/Props/(.*/)?SM_Prop_(Market_(Stall_0\d|Tray_0\d)|Well_01|Well_Plinth_01|Street_Lamp_0\d|Barrel_01|Barrel_Stack_0\d|Crate_Stack_0\d|Crate_Wood_01|Sack_Stack_0\d|Sack_0\d|Hay_(Bale_01|Cart_01|Pile_0\d)|Wood_Pile_0\d|Fence_0\d|Fence_Gate_01|Direction_Sign_0\d|Boat_01|Statue_(Hero_01|Plinth_01)|Gravestone_0\d|Log_0\d|Ground_(Planks|Logs)_0\d|Wheat_Bunch_01|Windmill_0\d|Table_Wood_0[1-3]|Bread_Crate_01)\.prefab$",
         r"re:PolygonFantasyKingdom/Prefabs/Vehicles/SM_Veh_(Cart_0\d|TraderWagon_01|Wheelbarrow_01|Boat_Dinghy_01)\.prefab$",
     ],
+    # icon candidates for the HUD mockup (unit types, cash, battle, buy and sell), rendered to images by an eval
+    r"E:\Game Assets\Synty\POLYGON - Icons Pack": [
+        r"re:PolygonIcons/Prefabs/SM_Icon_(Axe_0[12]|Shield_01|KnightHelmet_01|Armour_01|Crafting_Feather_01|Dagger_01|Sword_0[12]|Coin_0[1-3]|Coins_01|Arrow_0[1-5]|Arrow_Angled_01|Chevron_01|Crown_01|Banner_0[12]|Flag_01|Crafting_Bolt_01|Boots_01|Farm_01|Crop_01|Skull_01)\.prefab$",
+    ],
     # the kingdom map, from Synty's three nature biome packs. Entries starting "re:" are patterns matched against the
     # paths inside the package. Meadow Forest: the broadleaf woods, birches, orchards, meadow rocks and the grass,
     # dirt and rock ground layers. Alpine Mountain: pines, mountain rocks and cliffs, snow and rocky ground.
