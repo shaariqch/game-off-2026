@@ -170,6 +170,34 @@ public class KingdomMapBuilder : ScriptableObject
     public List<string> orchardTowns = new List<string> { "Harrowby", "Millbrook" };
     [Min(1f)] public float orchardRadius = 45f;
 
+    [Serializable]
+    public class Road
+    {
+        [Tooltip("World x, z. One point paints a round patch (a square or yard) of this width.")]
+        public List<Vector2> points = new List<Vector2>();
+        [Min(0.5f)] public float width = 4f;
+    }
+
+    [Serializable]
+    public class TownSite
+    {
+        public string name;
+        [Tooltip("Where the built town stands, world x, z (the Azgaar point is often on the river).")]
+        public Vector2 centre;
+        [Tooltip("Inside this many metres: no plants, and the ground levelled.")]
+        [Min(1f)] public float radius = 40f;
+        [Tooltip("How far the ground inside is pulled to the site's mean height (1 = flat).")]
+        [Range(0f, 1f)] public float level = 0.75f;
+        public List<Road> roads = new List<Road>();
+    }
+
+    [Header("Towns built on the map")]
+    [Tooltip("The buildings themselves are scene objects under the scene's Towns root, which a rebuild leaves alone; " +
+             "Tools > Map > Settle Towns On Ground puts them back on the ground after one.")]
+    public List<TownSite> sites = new List<TownSite>();
+    [Tooltip("The ground layer painted along town roads.")]
+    public TerrainLayer road;
+
     const string SettingsPath = "Assets/_Project/Settings/Kingdom Map.asset";
 
     [MenuItem("Tools/Map/Build Kingdom Terrain")]
@@ -221,6 +249,7 @@ public class KingdomMapBuilder : ScriptableObject
         var timer = System.Diagnostics.Stopwatch.StartNew();
         SampleCells();
         ShapeHeights();
+        LevelSites();
         var rivers = CarveRivers();
         ComputeSlope();
         ComputeCover();
@@ -423,6 +452,73 @@ public class KingdomMapBuilder : ScriptableObject
             }
         }
         heights = raised;
+    }
+
+    /// <summary>Pulls the ground inside each town site towards the site's mean height, fading out to its edge.
+    /// Runs before the rivers are cut, so a river through a site keeps its bed and banks.</summary>
+    void LevelSites()
+    {
+        foreach (var site in sites)
+        {
+            if (site.level <= 0f)
+                continue;
+            int x0 = Mathf.Max(0, Mathf.FloorToInt((site.centre.x - site.radius) / sx));
+            int x1 = Mathf.Min(nx - 1, Mathf.CeilToInt((site.centre.x + site.radius) / sx));
+            int z0 = Mathf.Max(0, Mathf.FloorToInt((site.centre.y - site.radius) / sz));
+            int z1 = Mathf.Min(nz - 1, Mathf.CeilToInt((site.centre.y + site.radius) / sz));
+            float sum = 0f; int count = 0;
+            for (int iz = z0; iz <= z1; iz++)
+            for (int ix = x0; ix <= x1; ix++)
+                if (Vector2.Distance(new Vector2(ix * sx, iz * sz), site.centre) < site.radius * 0.6f)
+                {
+                    sum += heights[iz * nx + ix];
+                    count++;
+                }
+            if (count == 0)
+                continue;
+            float mean = sum / count;
+            for (int iz = z0; iz <= z1; iz++)
+            for (int ix = x0; ix <= x1; ix++)
+            {
+                float d = Vector2.Distance(new Vector2(ix * sx, iz * sz), site.centre);
+                float t = site.level * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(site.radius * 0.55f, site.radius, d)));
+                int s = iz * nx + ix;
+                heights[s] = Mathf.Lerp(heights[s], mean, t);
+            }
+        }
+    }
+
+    /// <summary>How much of a town road covers a point: 1 on it, 0 off it, a short soft edge between.</summary>
+    float RoadAt(float x, float z)
+    {
+        float best = 0f;
+        var p = new Vector2(x, z);
+        foreach (var site in sites)
+        {
+            if ((p - site.centre).sqrMagnitude > (site.radius + 40f) * (site.radius + 40f))
+                continue;
+            foreach (var r in site.roads)
+            {
+                if (r.points.Count == 0)
+                    continue;
+                float d = float.MaxValue;
+                if (r.points.Count == 1)
+                    d = Vector2.Distance(p, r.points[0]);
+                for (int i = 1; i < r.points.Count; i++)
+                    d = Mathf.Min(d, DistanceToSegment(p, r.points[i - 1], r.points[i]));
+                float half = r.width * 0.5f;
+                float ragged = (Mathf.PerlinNoise(x * 0.35f + 11.3f, z * 0.35f - 4.1f) - 0.5f) * 0.9f;
+                best = Mathf.Max(best, Mathf.InverseLerp(half + 0.5f, half - 0.4f, d + ragged));
+            }
+        }
+        return best;
+    }
+
+    static float DistanceToSegment(Vector2 p, Vector2 a, Vector2 b)
+    {
+        var ab = b - a;
+        float t = ab.sqrMagnitude > 0f ? Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude) : 0f;
+        return Vector2.Distance(p, a + ab * t);
     }
 
     /// <summary>Box blur, repeated: close to a Gaussian.</summary>
@@ -698,7 +794,7 @@ public class KingdomMapBuilder : ScriptableObject
         return terrains;
     }
 
-    List<TerrainLayer> Layers() => new List<TerrainLayer> { grass, grassDry, grassFlowers, forestFloor, pineFloor, swampGrass, mud, shore, rock, snow };
+    List<TerrainLayer> Layers() => new List<TerrainLayer> { grass, grassDry, grassFlowers, forestFloor, pineFloor, swampGrass, mud, shore, rock, snow, road };
 
     /// <summary>A terrain tile over a rectangle of the world. Heights come from height(column, row) in metres.</summary>
     Terrain CreateTile(Transform parent, string name, string asset, float x0, float z0, float w, float l, int res, int ares,
@@ -833,6 +929,8 @@ public class KingdomMapBuilder : ScriptableObject
             Overlay(w, 8, rocky);
             float snowy = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(SnowLine(Mathf.Min(wz, length)), SnowLine(Mathf.Min(wz, length)) + snowBlend, h)) * (1f - rocky * 0.55f);
             Overlay(w, 9, snowy);
+            if (!beyond && count > 10)
+                Overlay(w, 10, RoadAt(x, z) * (1f - riverEdge));
             for (int k = 0; k < count; k++)
                 maps[az, ax, k] = w[k];
         }
@@ -921,6 +1019,11 @@ public class KingdomMapBuilder : ScriptableObject
                 foreach (var c in clearings)
                     if ((c - new Vector2(px, pz)).sqrMagnitude < townClearing * townClearing)
                         cleared = true;
+                foreach (var site in sites)
+                    if ((site.centre - new Vector2(px, pz)).sqrMagnitude < site.radius * site.radius)
+                        cleared = true;
+                if (!cleared && RoadAt(px, pz) > 0f)
+                    cleared = true;
                 if (cleared)
                     continue;
                 int t = Mathf.Clamp((int)(pz / tileLength), 0, tiles - 1);

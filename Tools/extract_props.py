@@ -47,6 +47,12 @@ JOBS = {
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Lily_01.prefab",
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Rock_03.prefab",
         "Assets/Synty/PolygonFantasyKingdom/Prefabs/Environments/SM_Env_Rock_04.prefab",
+        # towns on the kingdom map: the whole pack (the user's call, 2026-11-27), demo scenes included as layout references
+        r"re:^Assets/Synty/PolygonFantasyKingdom/",
+        r"re:PolygonFantasyKingdom/Prefabs/Buildings/Presets/SM_Bld_Preset_.*_Optimized\.prefab$",
+        r"re:PolygonFantasyKingdom/Prefabs/Environments/SM_Env_(Bridge_Stone_(01|Path_01)|Path_0\d|Path_Brick_Group_0\d|StoneWall_0\d|StoneWall_Pillar_01|Ground_Farm_(Row_0\d|Flat_01)|Ground_Flat_Dirt_0\d|Fountain_01|Bush_Flowers_0\d|Bush_Cluster_0\d|Flowers_0\d|Sunflower_0\d|Big_Tree_01|Tree_Large_0\d|Grass_WallEdge_0\d)\.prefab$",
+        r"re:PolygonFantasyKingdom/Prefabs/Props/(.*/)?SM_Prop_(Market_(Stall_0\d|Tray_0\d)|Well_01|Well_Plinth_01|Street_Lamp_0\d|Barrel_01|Barrel_Stack_0\d|Crate_Stack_0\d|Crate_Wood_01|Sack_Stack_0\d|Sack_0\d|Hay_(Bale_01|Cart_01|Pile_0\d)|Wood_Pile_0\d|Fence_0\d|Fence_Gate_01|Direction_Sign_0\d|Boat_01|Statue_(Hero_01|Plinth_01)|Gravestone_0\d|Log_0\d|Ground_(Planks|Logs)_0\d|Wheat_Bunch_01|Windmill_0\d|Table_Wood_0[1-3]|Bread_Crate_01)\.prefab$",
+        r"re:PolygonFantasyKingdom/Prefabs/Vehicles/SM_Veh_(Cart_0\d|TraderWagon_01|Wheelbarrow_01|Boat_Dinghy_01)\.prefab$",
     ],
     # the kingdom map, from Synty's three nature biome packs. Entries starting "re:" are patterns matched against the
     # paths inside the package. Meadow Forest: the broadleaf woods, birches, orchards, meadow rocks and the grass,

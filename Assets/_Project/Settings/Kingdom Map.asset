@@ -404,3 +404,39 @@ MonoBehaviour:
   - Harrowby
   - Millbrook
   orchardRadius: 45
+  sites:
+  - name: Millbrook
+    centre: {x: 178, y: 520}
+    radius: 46
+    level: 0.75
+    roads:
+    - points:
+      - {x: 94, y: 526}
+      - {x: 127, y: 523}
+      - {x: 149, y: 523}
+      - {x: 158, y: 522}
+      - {x: 178, y: 521}
+      - {x: 200, y: 522}
+      - {x: 216, y: 523}
+      - {x: 236, y: 527}
+      - {x: 256, y: 531}
+      width: 4.5
+    - points:
+      - {x: 168, y: 521}
+      width: 19
+    - points:
+      - {x: 174, y: 528}
+      - {x: 175, y: 542}
+      width: 3
+    - points:
+      - {x: 161, y: 512}
+      - {x: 159, y: 500}
+      - {x: 152, y: 489}
+      width: 3
+    - points:
+      - {x: 196, y: 521}
+      - {x: 198, y: 506}
+      - {x: 211, y: 496}
+      - {x: 218, y: 492}
+      width: 3
+  road: {fileID: 8574412962073106934, guid: 224d63e1442241943b8cafe00b71bdbd, type: 2}
