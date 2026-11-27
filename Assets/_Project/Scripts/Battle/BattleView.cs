@@ -160,19 +160,25 @@ public class BattleView : MonoBehaviour
     [SerializeField, Min(0.1f)] float slowLerpSpeed = 6f;
 
     [Header("Sounds (all optional)")]
+    [Tooltip("Its settings (mixer group, spatial blend) are copied to the voices the sounds play on.")]
     [SerializeField] AudioSource audioSource;
-    // TODO: a short blade or blunt hit on a body, played when a melee attack lands
-    [SerializeField] AudioClip meleeHitClip;
-    // TODO: a bow string release, played when an archer shoots
-    [SerializeField] AudioClip arrowShotClip;
-    // TODO: a short grunt or body fall, played when a unit dies
-    [SerializeField] AudioClip deathClip;
-    // TODO: a short fanfare or horn for the end of the battle
-    [SerializeField] AudioClip battleEndClip;
-    // TODO: galloping hooves into a crash of bodies and shields, played when a cavalry charge lands
-    [SerializeField] AudioClip chargeClip;
-    // TODO: a big shout and a clash of shields, played when the two battle lines meet
-    [SerializeField] AudioClip contactClip;
+    [Tooltip("Sounds that can play at once; the oldest is cut off past this.")]
+    [SerializeField, Min(1)] int voices = 16;
+    [Tooltip("A melee blow lands.")]
+    [SerializeField] BattleSound meleeHit = new BattleSound();
+    [Tooltip("An archer shoots.")]
+    [SerializeField] BattleSound arrowShot = new BattleSound();
+    [Tooltip("An arrow hits.")]
+    [SerializeField] BattleSound arrowHit = new BattleSound();
+    [Tooltip("A unit dies.")]
+    [SerializeField] BattleSound death = new BattleSound();
+    // TODO: galloping hooves into a crash of bodies and shields would suit it better; no owned pack has hooves yet
+    [Tooltip("A cavalry charge lands.")]
+    [SerializeField] BattleSound charge = new BattleSound();
+    [Tooltip("The two battle lines meet.")]
+    [SerializeField] BattleSound contact = new BattleSound();
+    [Tooltip("The battle ends.")]
+    [SerializeField] BattleSound battleEnd = new BattleSound();
 
     sealed class Figure
     {
@@ -368,7 +374,7 @@ public class BattleView : MonoBehaviour
         {
             reported = true;
             Debug.Log("[Battle] " + sim.Describe());
-            Play(battleEndClip);
+            Play(battleEnd);
             Finished?.Invoke(sim.Winner);
         }
     }
@@ -679,7 +685,7 @@ public class BattleView : MonoBehaviour
                 if (!figure.seenDeath)
                 {
                     figure.seenDeath = true;
-                    Play(deathClip);
+                    Play(death);
                     if (dyingAnimated)
                         figure.animation.Play(Pick(unit.type.deathClips), 0.15f, 0f, true);
                     if (figure.seat != null)
@@ -716,7 +722,7 @@ public class BattleView : MonoBehaviour
             {
                 figure.seenAttackTime = unit.lastAttackTime;
                 if (unit.lastAttackRanged)
-                    Play(arrowShotClip);
+                    Play(arrowShot);
                 if (figure.animation != null)
                 {
                     var type = unit.type;
@@ -787,7 +793,7 @@ public class BattleView : MonoBehaviour
                 case BattleSim.EventKind.Contact:
                     // the first blow between the lines: a thud down into the ground
                     Jolt(Vector3.down * contactJolt);
-                    Play(contactClip);
+                    Play(contact);
                     // usually the moment started as the lines closed; this catches lines that met some other way
                     if (!contactMomentSeen)
                     {
@@ -805,7 +811,7 @@ public class BattleView : MonoBehaviour
                         nextChargeJoltAt = Time.unscaledTime + chargeJoltGap;
                         Jolt((along + Vector3.down * 0.4f) * chargeJolt * (showing ? 1.6f : 1f));
                     }
-                    Play(chargeClip);
+                    Play(charge);
                     // the mount puts its weight into it
                     if (e.unit.id < figures.Count && figures[e.unit.id].mountAnimation != null && e.unit.type.mount.chargeClip != null)
                         figures[e.unit.id].mountAnimation.Play(e.unit.type.mount.chargeClip, 0.06f);
@@ -820,19 +826,20 @@ public class BattleView : MonoBehaviour
                     break;
                 }
                 case BattleSim.EventKind.BracedCharge:
-                    Play(meleeHitClip);
+                    Play(meleeHit);
                     Squash(e.unit, 2f);
                     ShowNumber(e.other, e.damage, false);
                     Emit(hits, at, sparkColour, 10);
                     break;
                 case BattleSim.EventKind.Hit:
-                    Play(meleeHitClip);
+                    Play(meleeHit);
                     Squash(e.other, e.rear ? 1.6f : 1f);
                     Flinch(e.other, false);
                     ShowNumber(e.other, e.damage, e.rear);
                     Emit(hits, at, hitColour, e.rear ? 6 : 3);
                     break;
                 case BattleSim.EventKind.ArrowHit:
+                    Play(arrowHit);
                     Squash(e.other, 0.6f);
                     Flinch(e.other, false);
                     ShowNumber(e.other, e.damage, false);
@@ -1136,10 +1143,50 @@ public class BattleView : MonoBehaviour
         return new Vector3(flat.x, height, flat.y);
     }
 
-    void Play(AudioClip clip)
+    readonly List<AudioSource> voicePool = new List<AudioSource>();
+    readonly List<bool> voiceKept = new List<bool>();
+    int nextVoice;
+
+    /// <summary>Plays a sound on the next voice in turn, each voice with its own pitch.</summary>
+    void Play(BattleSound sound)
     {
-        if (clip != null && audioSource != null)
-            audioSource.PlayOneShot(clip);
+        if (audioSource == null || sound == null || !sound.Pick(out var clip, out float pitch))
+            return;
+        if (voicePool.Count == 0)
+        {
+            for (int i = 0; i < voices; i++)
+            {
+                var voice = gameObject.AddComponent<AudioSource>();
+                voice.playOnAwake = false;
+                voice.outputAudioMixerGroup = audioSource.outputAudioMixerGroup;
+                voice.spatialBlend = audioSource.spatialBlend;
+                voice.priority = audioSource.priority;
+                voicePool.Add(voice);
+                voiceKept.Add(false);
+            }
+        }
+        // a free voice if there is one, else the next in turn that isn't holding a kept sound
+        int chosen = -1;
+        for (int i = 0; i < voicePool.Count && chosen < 0; i++)
+        {
+            int v = (nextVoice + i) % voicePool.Count;
+            if (!voicePool[v].isPlaying) chosen = v;
+        }
+        for (int i = 0; i < voicePool.Count && chosen < 0; i++)
+        {
+            int v = (nextVoice + i) % voicePool.Count;
+            if (!voiceKept[v]) chosen = v;
+        }
+        if (chosen < 0)
+            return;
+        nextVoice = (chosen + 1) % voicePool.Count;
+        voiceKept[chosen] = sound.keep;
+        var next = voicePool[chosen];
+        next.Stop();
+        next.clip = clip;
+        next.pitch = pitch;
+        next.volume = audioSource.volume * sound.volume;
+        next.Play();
     }
 
     void OnDisable()

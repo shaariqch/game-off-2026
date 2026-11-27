@@ -85,6 +85,13 @@ JOBS = {
         "Assets/Quirky Series/Ultimate Pack Vol.1/Mega Pack Vol.1/Safari Vol.1/Animations/Zebra_Animations.fbx",
         "Assets/Quirky Series/Ultimate Pack Vol.1/Mega Pack Vol.1/Safari Vol.1/Animations/AC_Zebra.controller",
     ],
+    # battle sounds (the user's call, 2026-11-27): FS Melee's sword clashes, hits and slams, and Feel's demo grunts
+    os.path.join(os.environ.get("APPDATA", ""), r"Unity\Asset Store-5.x\Fantacode Studios\Editor ExtensionsGame Toolkits\FS - Melee Combat System.unitypackage"): [
+        r"re:^Assets/Fantacode Studios/Melee Combat System/Sfx/(sword clash|sword clash 2|sword-hit-flesh|hit|hit 2|hit 3|hit blocked|scream|Slam|Fall and Take Hit)\.wav$",
+    ],
+    os.path.join(os.environ.get("APPDATA", ""), r"Unity\Asset Store-5.x\More Mountains\ScriptingEffects\Feel.unitypackage"): [
+        r"re:^Assets/Feel/FeelDemos/Barbarians/Sounds/FeelBarbarian(sGrunt\d|Hit)\.wav$",
+    ],
 }
 # packs already partly imported somewhere else; new files from them go there too
 REMAP = {
@@ -93,6 +100,8 @@ REMAP = {
     "Assets/Synty/": "Assets/_Project/ThirdParty/Synty/",
     "Assets/Quirky Series/": "Assets/_Project/ThirdParty/Quirky Series/",
     "Assets/CelerisLab/": "Assets/_Project/ThirdParty/CelerisLab/",
+    "Assets/Fantacode Studios/Melee Combat System/Sfx/": "Assets/_Project/ThirdParty/Audio/FS Melee/",
+    "Assets/Feel/FeelDemos/Barbarians/Sounds/": "Assets/_Project/ThirdParty/Audio/Feel Barbarians/",
 }
 # python Tools/extract_props.py icons: only the jobs whose pack name contains that word, to skip re-reading the rest
 if len(sys.argv) > 1:
