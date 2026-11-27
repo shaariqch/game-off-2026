@@ -70,8 +70,11 @@ public class TradeRun : MonoBehaviour
     [SerializeField, Min(0)] int startingCash = 200;
     [Tooltip("The design doc's placeholder is five battles; how it feels to play will decide.")]
     [SerializeField, Min(1)] int battlesPerRun = 5;
-    [Tooltip("Seconds of trading before each battle.")]
+    [Tooltip("Timeline seconds of trading before each battle; Pace sets how long that takes in real time.")]
     [SerializeField, Min(5f)] float phaseLength = 75f;
+    [Tooltip("How fast the timeline and the market run: 1 is a phase in Phase Length seconds, 0.5 takes twice as long. "
+        + "Event times, price moves and fades all slow together; the Shift keys keep their own timing.")]
+    [SerializeField, Range(0.2f, 2f)] float pace = 0.6f;
     [Tooltip("0 picks a new seed every run.")]
     [SerializeField] int seed;
 
@@ -263,8 +266,10 @@ public class TradeRun : MonoBehaviour
             return;
         }
 
+        // the timeline and the market run at the pace; the keys below stay in real time
+        float phaseDt = dt * pace;
         float before = PhaseTime;
-        PhaseTime = Mathf.Min(PhaseTime + dt, phaseLength);
+        PhaseTime = Mathf.Min(PhaseTime + phaseDt, phaseLength);
         foreach (var marketEvent in events)
         {
             if (marketEvent.time > before && marketEvent.time <= PhaseTime)
@@ -275,7 +280,7 @@ public class TradeRun : MonoBehaviour
                 Debug.Log($"[Trade] event at {marketEvent.place}: {marketEvent.text}");
             }
         }
-        Market.Tick(dt);
+        Market.Tick(phaseDt);
 
         if (input)
         {
