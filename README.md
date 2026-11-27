@@ -72,7 +72,7 @@ The code is here to be read; the playable game is the build on itch.io.
 |---|---|---|---|---|
 | POLYGON - Fantasy Kingdom Pack | Synty Studios | Soldiers, weapons, banners and field props; the towns on the kingdom map (buildings, bridge, market, farm and street props) | Synty Store licence | No |
 | ANIMATION - Base Locomotion | Synty Studios | Soldiers' idle, walk and run | Synty Store licence | No |
-| FS - Melee Combat System | Fantacode Studios | Sword attack and hit reaction animations (clips only); battle sounds (sword clashes, hits, a slam, a fall) | Unity Asset Store EULA | No |
+| FS - Melee Combat System | Fantacode Studios | Sword attack and hit reaction animations (clips only) | Unity Asset Store EULA | No |
 | Stylish Archer Assets Pack | Grruzam | Bow shot, hit reaction and death animations (clips only) | Unity Asset Store EULA | No |
 | Quirky Series - Animals Mega Pack Vol.1 | Omabuarts Studio | The cavalry's horses: the zebra, recoloured as a bay horse, with its own animations | Unity Asset Store EULA | No |
 | POLYGON - Meadow Forest - Nature Biome | Synty Studios | The kingdom map: broadleaf and fruit trees, birches, bushes, grass, gravel and rock ground layers | Synty Store licence | No |
@@ -82,9 +82,7 @@ The code is here to be read; the playable game is the build on itch.io.
 | POLYGON - Icons Pack | Synty Studios | The Trade HUD's icons (units, cash, battle), rendered from its 3D icons | Synty Store licence | No |
 | COZY: Stylized Weather 3 | Distant Lands | The kingdom map's time of day, sun, moon and sky light, fog and weather | Unity Asset Store EULA | No |
 | The Complete UI Sound Effects Library | Celeris Lab | The Trade HUD's sounds (key presses, counting, trades, notices) | Unity Asset Store EULA | No |
-| Feel | More Mountains | Battle feel (slow motion, freeze frames, squash springs) and the Trade HUD's key feedback; battle sounds from its samples (soldiers' grunts, a bow release) | Unity Asset Store EULA | No |
-| Impact Sounds | Kenney | Battle sounds: metal, punch, plate and wood impacts | CC0 1.0 | No |
-| Cinematic Horn Braams (GDC 2026 Game Audio Bundle, Sonniss) | Jake Fielding | The horns when the battle lines meet and when a battle ends | Sonniss GDC bundle licence (royalty-free) | No |
+| Feel | More Mountains | Battle feel (slow motion, freeze frames, squash springs) and the Trade HUD's key feedback | Unity Asset Store EULA | No |
 | Cinzel | Natanael Gama | HUD headings, unit names and key labels | SIL Open Font License 1.1 | Yes, `Assets/_Project/Fonts` |
 | Alegreya Sans | Juan Pablo del Peral (Huerta Tipográfica) | HUD numbers and text, in copies whose digits use the font's own lining figures (`Tools/lining_figures.py`) | SIL Open Font License 1.1 | Yes, `Assets/_Project/Fonts` |
 

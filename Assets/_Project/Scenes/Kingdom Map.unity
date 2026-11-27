@@ -8683,7 +8683,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7481130337564779861, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_Enabled
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7481130337564779861, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_Shadows.m_Type
@@ -14467,81 +14467,43 @@ MonoBehaviour:
   audioSource: {fileID: 1241300890}
   voices: 16
   meleeHit:
-    clips:
-    - {fileID: 8300000, guid: a7d53582afb3b8846ad929e464fff327, type: 3}
-    - {fileID: 8300000, guid: cc011263ce999784aa356ec9fccc9811, type: 3}
-    - {fileID: 8300000, guid: 27691fc69e6f8d74193376c406fd150e, type: 3}
-    - {fileID: 8300000, guid: 85f392f6c46b895459b500124080d0d8, type: 3}
-    - {fileID: 8300000, guid: 1bf0d3dd278041e44b0d4b6f1cb02254, type: 3}
-    - {fileID: 8300000, guid: cff311b7ad1f7224882f5e34fce130a0, type: 3}
-    - {fileID: 8300000, guid: cd4c0ee95306ef047bd8c7f11b46817c, type: 3}
-    - {fileID: 8300000, guid: b6d280a8ef9ef254ea107e0bd36dbdc3, type: 3}
-    - {fileID: 8300000, guid: 1ece3d526d949cd4387c006bbf40d08b, type: 3}
-    - {fileID: 8300000, guid: f99fc111655d59146ab549bfe9214bfc, type: 3}
-    - {fileID: 8300000, guid: 2c15df38850345049ba906302e61d287, type: 3}
-    - {fileID: 8300000, guid: 5e06c1753c1331441944404817dc189f, type: 3}
+    clips: []
     volume: 0.45
     pitch: {x: 0.9, y: 1.1}
     minGap: 0.06
     keep: 0
   arrowShot:
-    clips:
-    - {fileID: 8300000, guid: 83e12bc2a9e7c466f85a0a9056f121ef, type: 3}
+    clips: []
     volume: 0.35
     pitch: {x: 0.9, y: 1.15}
     minGap: 0.08
     keep: 0
   arrowHit:
-    clips:
-    - {fileID: 8300000, guid: 20ae358f65620ba479be116d0baa6e5d, type: 3}
-    - {fileID: 8300000, guid: 34834e28c59fb5e4e95f9aa53560fc2d, type: 3}
-    - {fileID: 8300000, guid: 2199e732de1a1fd42a20686b86a96b98, type: 3}
-    - {fileID: 8300000, guid: efa5595dd92aeed4c8dcc5d9658b7638, type: 3}
-    - {fileID: 8300000, guid: e5a94e42f3081244d84a746ca4778488, type: 3}
+    clips: []
     volume: 0.3
     pitch: {x: 0.9, y: 1.15}
     minGap: 0.08
     keep: 0
   death:
-    clips:
-    - {fileID: 8300000, guid: ca7e829e9f876ea4a95a4edad95deb8e, type: 3}
-    - {fileID: 8300000, guid: 18f19d03b5eb5f6438c7255ed4adfd44, type: 3}
-    - {fileID: 8300000, guid: 1a197a36b1e09c44cb1d60ee4ceec601, type: 3}
-    - {fileID: 8300000, guid: 5f02d8d8a7340884fbac3973015477d1, type: 3}
-    - {fileID: 8300000, guid: 33ddda99f69e68f4282034c2b1614c56, type: 3}
-    - {fileID: 8300000, guid: 111ceb42462404e47baaa3d80b414351, type: 3}
-    - {fileID: 8300000, guid: 9822c0561cbd633419ad4f3dc0c58731, type: 3}
+    clips: []
     volume: 0.55
     pitch: {x: 0.85, y: 1.1}
     minGap: 0.12
     keep: 0
   charge:
-    clips:
-    - {fileID: 8300000, guid: 7f47600b1c51c804f8ee070101b94fdb, type: 3}
-    - {fileID: 8300000, guid: c67c821c18bc7d74c84e8af7e92c6f77, type: 3}
-    - {fileID: 8300000, guid: 91eb94f0d26243740b3d609a34a46b6a, type: 3}
-    - {fileID: 8300000, guid: d4e4c81de58f8c74dace5ea48bf58dab, type: 3}
-    - {fileID: 8300000, guid: 209c08cd2420db2478b6f0029f0bc5d0, type: 3}
-    - {fileID: 8300000, guid: caee0199b633f7a468af8a12bd288e35, type: 3}
-    - {fileID: 8300000, guid: 87c6e04a43fb3e04d91173506f1de22f, type: 3}
-    - {fileID: 8300000, guid: 9033f78940ad27548a499c0e7607ae4a, type: 3}
-    - {fileID: 8300000, guid: a7d3a83266c56bd489c7962afedc327e, type: 3}
-    - {fileID: 8300000, guid: fc3e15ee23bfe9f4aa542a9d9a1e782d, type: 3}
-    - {fileID: 8300000, guid: 0f064c3595703964cae186bfa6bb1fed, type: 3}
+    clips: []
     volume: 0.8
     pitch: {x: 0.85, y: 1.05}
     minGap: 0.15
     keep: 0
   contact:
-    clips:
-    - {fileID: 8300000, guid: 08520c7f977a8f2458a213f2ea1709d1, type: 3}
+    clips: []
     volume: 0.6
     pitch: {x: 1, y: 1}
     minGap: 2
     keep: 1
   battleEnd:
-    clips:
-    - {fileID: 8300000, guid: 31533b5a5ccc88b4c8ceef7e6e8d285e, type: 3}
+    clips: []
     volume: 0.6
     pitch: {x: 1, y: 1}
     minGap: 2
