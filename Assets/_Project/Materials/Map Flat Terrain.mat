@@ -116,7 +116,7 @@ Material:
     - _GradientSize: 10
     - _HeightTransition: 0
     - _LightContribution: 0.4
-    - _LightFalloffSize: 0
+    - _LightFalloffSize: 0.06
     - _LightmapDirectionPitch: 0
     - _LightmapDirectionYaw: 0
     - _Metallic0: 0

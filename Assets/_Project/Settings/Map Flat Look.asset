@@ -40,6 +40,7 @@ MonoBehaviour:
   leafGradientColour: {r: 0.45, g: 0.55, b: 0.6, a: 1}
   leafGradientSize: 7
   leafGradientCentre: 2.5
+  lampSoftness: 0.06
   shadowColour: {r: 0.27, g: 0.26, b: 0.45, a: 0.55}
   groundDetail: 0.3
   groundSaturation: 1.25

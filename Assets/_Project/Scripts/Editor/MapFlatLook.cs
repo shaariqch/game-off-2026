@@ -66,6 +66,11 @@ public class MapFlatLook : ScriptableObject
     public float leafGradientSize = 7f;
     public float leafGradientCentre = 2.5f;
 
+    [Header("Lamps")]
+    [Tooltip("Flat Kit's Point / Spot Light Edge on every copy and the terrain. At 0 a lamp lights a flat disc with a " +
+             "hard rim; this smooths its falloff (URP's falloff is about 0.04 at 5 m, so small values reach far).")]
+    [Range(0f, 0.5f)] public float lampSoftness = 0.06f;
+
     [Header("Shadows")]
     [Tooltip("Cast shadows take this colour instead of just darkening (alpha is how strongly).")]
     public Color shadowColour = new Color(0.27f, 0.26f, 0.45f, 0.55f);
@@ -158,6 +163,11 @@ public class MapFlatLook : ScriptableObject
             }
         }
 
+        if (flat && terrainMaterial != null)
+        {
+            terrainMaterial.SetFloat("_LightFalloffSize", lampSoftness);
+            EditorUtility.SetDirty(terrainMaterial);
+        }
         foreach (var terrain in terrains)
         {
             var land = flat ? terrainMaterial : plainTerrainMaterial;
@@ -398,6 +408,7 @@ public class MapFlatLook : ScriptableObject
         copy.SetFloat("_ShadowEdgeSize", cel.edgeSize);
         copy.SetFloat("_Flatness", cel.flatness);
         copy.SetFloat("_LightContribution", cel.lightContribution);
+        copy.SetFloat("_LightFalloffSize", lampSoftness);
 
         // cast shadows in a colour of their own rather than plain darkening
         copy.SetFloat("_UnityShadowMode", 2f);

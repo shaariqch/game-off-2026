@@ -3993,7 +3993,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6948066750454693066, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 230
+      value: 95
       objectReference: {fileID: 0}
     - target: {fileID: 6948066750454693066, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_LocalPosition.z
@@ -4106,6 +4106,7 @@ MonoBehaviour:
   startHeight: 40
   sizeScale: 6
   rateScale: 4
+  mistScale: 1.5
   streakScale: 2
   weatherEffects:
   - Rain
