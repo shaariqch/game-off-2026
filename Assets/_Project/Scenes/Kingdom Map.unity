@@ -8687,7 +8687,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7481130337564779861, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_Shadows.m_Type
-      value: 0
+      value: 2
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -8727,7 +8727,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MapDayCycle
   run: {fileID: 1909177707}
   dayStart: 7
-  dayEnd: 19.5
+  dayEnd: 14
   timeOfYear: 0.5
   previewHour: 10
 --- !u!114 &666695210
@@ -16108,7 +16108,7 @@ Camera:
   far clip plane: 2500
   field of view: 34
   orthographic: 0
-  orthographic size: 5
+  orthographic size: 10
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
@@ -18456,7 +18456,7 @@ MonoBehaviour:
     m_Value: 0
   OutputChannel: 1
   StandbyUpdate: 2
-  m_StreamingVersion: 0
+  m_StreamingVersion: 20241001
   m_LegacyPriority: 0
   Target:
     TrackingTarget: {fileID: 0}
