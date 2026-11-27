@@ -18908,6 +18908,7 @@ MonoBehaviour:
   startingCash: 200
   battlesPerRun: 5
   phaseLength: 75
+  pace: 0.4
   seed: 0
   marketSettings:
     buyImpact: 0.015

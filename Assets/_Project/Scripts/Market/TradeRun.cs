@@ -28,7 +28,7 @@ public class TradeRun : MonoBehaviour
     {
         /// <summary>The key went down and started counting at one.</summary>
         Press,
-        /// <summary>The same key went down again during the countdown and carries on counting.</summary>
+        /// <summary>The same key went down again during the countdown: one more, and holding carries on counting.</summary>
         Resume,
         /// <summary>The key came up and the countdown started.</summary>
         Release,
@@ -74,7 +74,7 @@ public class TradeRun : MonoBehaviour
     [SerializeField, Min(5f)] float phaseLength = 75f;
     [Tooltip("How fast the timeline and the market run: 1 is a phase in Phase Length seconds, 0.5 takes twice as long. "
         + "Event times, price moves and fades all slow together; the Shift keys keep their own timing.")]
-    [SerializeField, Range(0.2f, 2f)] float pace = 0.6f;
+    [SerializeField, Range(0.2f, 2f)] float pace = 0.4f;
     [Tooltip("0 picks a new seed every run.")]
     [SerializeField] int seed;
 
@@ -351,11 +351,20 @@ public class TradeRun : MonoBehaviour
             }
             else if (mine.state == OrderState.Counting && mine.row == Selected)
             {
-                // carry on counting from where it was, without the tap pause
+                // each press adds one, and holding carries on counting from there, so taps and holds mix
                 mine.state = OrderState.Holding;
-                mine.heldFor = tapGrace;
+                mine.heldFor = 0f;
                 mine.countDebt = 0f;
-                KeyMoved?.Invoke(mine.side, KeyMoment.Resume, mine.count);
+                if (mine.count < Cap(mine.side, mine.row))
+                {
+                    mine.count++;
+                    KeyMoved?.Invoke(mine.side, KeyMoment.Resume, mine.count);
+                }
+                else
+                {
+                    mine.capped = true;
+                    KeyMoved?.Invoke(mine.side, KeyMoment.Capped, mine.count);
+                }
             }
             else
             {
