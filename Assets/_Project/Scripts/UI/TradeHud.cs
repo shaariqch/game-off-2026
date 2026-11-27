@@ -24,6 +24,10 @@ public class TradeHud : MonoBehaviour
     [SerializeField] Color noticeColour = new Color(0.498f, 0.769f, 0.788f);
     [SerializeField] Color invasionColour = new Color(0.878f, 0.396f, 0.31f);
 
+    [Header("Trade bar")]
+    [Tooltip("Seconds the bar stays full after a trade goes through, while its word shows, before it fades.")]
+    [SerializeField, Min(0f)] float tradeHold = 0.9f;
+
     sealed class Row
     {
         public VisualElement root;
@@ -33,9 +37,9 @@ public class TradeHud : MonoBehaviour
 
     sealed class Key
     {
-        public VisualElement root, fill;
-        public Label count, fillCount;
-        public HudShape arrow, fillArrow;
+        public VisualElement root;
+        public Label count;
+        public HudShape arrow;
     }
 
     sealed class Notice
@@ -47,6 +51,10 @@ public class TradeHud : MonoBehaviour
     }
 
     VisualElement hud, units, unitRows, eventDots, now, trackBehind, timeline, notices;
+    VisualElement trade, tradeFillBuy, tradeFillSell;
+    // the last trade that went through, so the bar can stay full for a moment after it
+    TradeRun.Side tradedSide;
+    float tradedAt = float.NegativeInfinity;
     Label cashValue, battleLabel, description;
     readonly List<Row> rows = new List<Row>();
     readonly List<(MarketEvent marketEvent, VisualElement dot)> dots = new List<(MarketEvent, VisualElement)>();
@@ -78,6 +86,10 @@ public class TradeHud : MonoBehaviour
         description = hud.Q<Label>("description");
         hud.Q("cash-icon").style.backgroundImage = cashIcon;
         hud.Q("battle-icon").style.backgroundImage = battleIcon;
+        trade = hud.Q("trade");
+        tradeFillBuy = hud.Q("trade-fill-buy");
+        tradeFillSell = hud.Q("trade-fill-sell");
+        hud.Q("trade-result").style.opacity = 0f;
 
         BuildRows();
         buyKey = BuildKey(hud.Q("buy"), TradeRun.Side.Buy);
@@ -86,13 +98,18 @@ public class TradeHud : MonoBehaviour
         shown.Clear();
         builtForBattle = -1;
         run.EventStarted += OnEventStarted;
+        run.Traded += OnTraded;
+        tradedAt = float.NegativeInfinity;
         built = true;
     }
 
     void OnDisable()
     {
         if (run != null)
+        {
             run.EventStarted -= OnEventStarted;
+            run.Traded -= OnTraded;
+        }
         built = false;
     }
 
@@ -146,19 +163,11 @@ public class TradeHud : MonoBehaviour
     Key BuildKey(VisualElement root, TradeRun.Side side)
     {
         root.Clear();
-        var key = new Key { root = root };
-        key.fill = new VisualElement();
-        key.fill.AddToClassList("key-fill");
         var (content, count, arrow) = KeyContent(side);
-        var (fillContent, fillCount, fillArrow) = KeyContent(side);
+        // named so the TradeFeel players can find them
+        count.name = root.name + "-count";
         root.Add(content);
-        key.fill.Add(fillContent);
-        root.Add(key.fill);
-        key.count = count;
-        key.fillCount = fillCount;
-        key.arrow = arrow;
-        key.fillArrow = fillArrow;
-        return key;
+        return new Key { root = root, count = count, arrow = arrow };
     }
 
     static (VisualElement content, Label count, HudShape arrow) KeyContent(TradeRun.Side side)
@@ -287,26 +296,56 @@ public class TradeHud : MonoBehaviour
         }
         description.text = run.Unit(run.Selected).description;
 
-        ShowKey(buyKey, run.buy);
-        ShowKey(sellKey, run.sell);
+        ShowKey(buyKey, run.buy, run.sell);
+        ShowKey(sellKey, run.sell, run.buy);
+        ShowTradeBar();
         ShowNotices();
     }
 
-    void ShowKey(Key key, TradeRun.Order order)
+    void ShowKey(Key key, TradeRun.Order order, TradeRun.Order other)
     {
         bool idle = order.state == TradeRun.OrderState.Idle;
         key.root.EnableInClassList("key--idle", idle);
+        key.root.EnableInClassList("key--active", !idle);
         key.root.EnableInClassList("key--holding", order.state == TradeRun.OrderState.Holding);
+        key.root.EnableInClassList("key--other", idle && other.state != TradeRun.OrderState.Idle);
         key.root.EnableInClassList("key--has-count", !idle);
         key.root.EnableInClassList("key--closed", run.AtBattle);
-        string count = order.side == TradeRun.Side.Buy ? "+" + order.count : "−" + order.count;
-        key.count.text = key.fillCount.text = count;
-        if (!idle)
-            key.fill.style.width = Length.Percent(run.Progress(order) * 100f);
-        else
-            key.fill.style.width = StyleKeyword.Null;
+        key.count.text = order.side == TradeRun.Side.Buy ? "+" + order.count : "−" + order.count;
         key.arrow.MarkDirtyRepaint();
-        key.fillArrow.MarkDirtyRepaint();
+    }
+
+    void OnTraded(TradeRun.Side side, int unit, int count)
+    {
+        if (count <= 0)
+            return;
+        tradedSide = side;
+        tradedAt = Time.unscaledTime;
+    }
+
+    /// <summary>
+    /// One bar for both keys: a buy fills it from the left to the line in the middle, a sell from the right, through
+    /// the countdown after the key is let go. It shows while a key is in use, and stays full for a moment after a trade.
+    /// </summary>
+    void ShowTradeBar()
+    {
+        var active = run.Active;
+        float buyFill = 0f, sellFill = 0f;
+        bool justTraded = Time.unscaledTime - tradedAt < tradeHold;
+        if (active != null)
+        {
+            float progress = run.Progress(active);
+            if (active.side == TradeRun.Side.Buy) buyFill = progress;
+            else sellFill = progress;
+        }
+        else if (justTraded)
+        {
+            if (tradedSide == TradeRun.Side.Buy) buyFill = 1f;
+            else sellFill = 1f;
+        }
+        tradeFillBuy.style.width = Length.Percent(buyFill * 50f);
+        tradeFillSell.style.width = Length.Percent(sellFill * 50f);
+        trade.EnableInClassList("trade--shown", (active != null || justTraded) && !run.AtBattle);
     }
 
     void ShowNotices()

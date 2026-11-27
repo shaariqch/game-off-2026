@@ -21,6 +21,22 @@ public class TradeRun : MonoBehaviour
     public enum Focus { Map, Units }
     public enum Side { Buy, Sell }
     public enum OrderState { Idle, Holding, Counting }
+    /// <summary>Something a Shift key did, for the HUD's feedback.</summary>
+    public enum KeyMoment
+    {
+        /// <summary>The key went down and started counting at one.</summary>
+        Press,
+        /// <summary>The same key went down again during the countdown and carries on counting.</summary>
+        Resume,
+        /// <summary>The key came up and the countdown started.</summary>
+        Release,
+        /// <summary>The count went up by one.</summary>
+        Count,
+        /// <summary>The count reached what can be afforded or is held, or a press found nothing to trade.</summary>
+        Capped,
+        /// <summary>The other key cancelled this order.</summary>
+        Cancelled,
+    }
 
     public sealed class Order
     {
@@ -67,18 +83,8 @@ public class TradeRun : MonoBehaviour
     [SerializeField] MapCamera mapCamera;
 
     [Header("Sounds")]
+    [Tooltip("The Shift keys' own sounds are on the HUD's TradeFeel players, with their feedback.")]
     [SerializeField] AudioSource audioSource;
-    [Tooltip("A Shift key goes down and starts or resumes counting.")]
-    [SerializeField] AudioClip keyDownClip;
-    [Tooltip("A Shift key comes up and the countdown starts.")]
-    [SerializeField] AudioClip keyUpClip;
-    [Tooltip("The count goes up by one. Its pitch rises a little with the count.")]
-    [SerializeField] AudioClip countClip;
-    [SerializeField] AudioClip boughtClip;
-    [SerializeField] AudioClip soldClip;
-    [SerializeField] AudioClip cancelClip;
-    [Tooltip("Can't afford any more, or has none left to sell.")]
-    [SerializeField] AudioClip cappedClip;
     [Tooltip("Up and down move the selection in the unit list.")]
     [SerializeField] AudioClip selectClip;
     [Tooltip("Left and right move focus between the map and the unit list.")]
@@ -87,7 +93,6 @@ public class TradeRun : MonoBehaviour
     [SerializeField] AudioClip invasionClip;
     [Tooltip("The timeline reaches the battle and trading stops.")]
     [SerializeField] AudioClip battleClip;
-    [SerializeField, Range(0f, 1f)] float countVolume = 0.5f;
 
     public Market Market { get; private set; }
     public int Cash { get; private set; }
@@ -110,6 +115,8 @@ public class TradeRun : MonoBehaviour
     public event Action<MarketEvent> EventStarted;
     /// <summary>A trade went through: side, unit index, how many.</summary>
     public event Action<Side, int, int> Traded;
+    /// <summary>A Shift key did something: side, what, and the order's count after it.</summary>
+    public event Action<Side, KeyMoment, int> KeyMoved;
 
     int[] held;
 
@@ -244,7 +251,7 @@ public class TradeRun : MonoBehaviour
             if (other.state != OrderState.Idle)
             {
                 Reset(other);
-                Play(cancelClip);
+                KeyMoved?.Invoke(other.side, KeyMoment.Cancelled, 0);
                 mine.spent = true;
             }
             else if (mine.state == OrderState.Counting && mine.unit == Selected)
@@ -253,14 +260,14 @@ public class TradeRun : MonoBehaviour
                 mine.state = OrderState.Holding;
                 mine.heldFor = tapGrace;
                 mine.countDebt = 0f;
-                Play(keyDownClip);
+                KeyMoved?.Invoke(mine.side, KeyMoment.Resume, mine.count);
             }
             else
             {
                 Complete(mine);
                 if (Cap(mine.side, Selected) <= 0)
                 {
-                    Play(cappedClip);
+                    KeyMoved?.Invoke(mine.side, KeyMoment.Capped, 0);
                     mine.spent = true;
                 }
                 else
@@ -271,7 +278,7 @@ public class TradeRun : MonoBehaviour
                     mine.heldFor = 0f;
                     mine.countDebt = 0f;
                     mine.capped = Cap(mine.side, Selected) <= 1;
-                    Play(keyDownClip);
+                    KeyMoved?.Invoke(mine.side, KeyMoment.Press, mine.count);
                 }
             }
         }
@@ -288,7 +295,7 @@ public class TradeRun : MonoBehaviour
         {
             mine.state = OrderState.Counting;
             mine.countdownLeft = countdown;
-            Play(keyUpClip);
+            KeyMoved?.Invoke(mine.side, KeyMoment.Release, mine.count);
             return;
         }
 
@@ -304,12 +311,12 @@ public class TradeRun : MonoBehaviour
             if (mine.count < cap)
             {
                 mine.count++;
-                Play(countClip, countVolume, 1f + Mathf.Min(mine.count, 40) * 0.008f);
+                KeyMoved?.Invoke(mine.side, KeyMoment.Count, mine.count);
             }
             else
             {
                 if (!mine.capped)
-                    Play(cappedClip);
+                    KeyMoved?.Invoke(mine.side, KeyMoment.Capped, mine.count);
                 mine.capped = true;
                 mine.countDebt = 0f;
                 break;
@@ -347,7 +354,6 @@ public class TradeRun : MonoBehaviour
             var (bought, spent) = Market.Buy(unit, order.count, Cash);
             Cash -= spent;
             held[unit] += bought;
-            if (bought > 0) Play(boughtClip);
             Debug.Log($"[Trade] bought {bought} {Unit(unit).name} for {spent}, cash {Cash}");
             Traded?.Invoke(Side.Buy, unit, bought);
         }
@@ -357,7 +363,6 @@ public class TradeRun : MonoBehaviour
             int made = Market.Sell(unit, count);
             Cash += made;
             held[unit] -= count;
-            if (count > 0) Play(soldClip);
             Debug.Log($"[Trade] sold {count} {Unit(unit).name} for {made}, cash {Cash}");
             Traded?.Invoke(Side.Sell, unit, count);
         }
@@ -380,26 +385,9 @@ public class TradeRun : MonoBehaviour
         return parts.Count == 0 ? "none" : string.Join(", ", parts);
     }
 
-    void Play(AudioClip clip, float volume = 1f, float pitch = 1f)
+    void Play(AudioClip clip)
     {
-        if (clip == null || audioSource == null)
-            return;
-        if (Mathf.Approximately(pitch, 1f))
-        {
-            audioSource.PlayOneShot(clip, volume);
-            return;
-        }
-        // a source's pitch applies to every sound it's playing, so pitched ticks get a source of their own
-        if (countSource == null)
-        {
-            countSource = gameObject.AddComponent<AudioSource>();
-            countSource.playOnAwake = false;
-            countSource.spatialBlend = 0f;
-            countSource.outputAudioMixerGroup = audioSource.outputAudioMixerGroup;
-        }
-        countSource.pitch = pitch;
-        countSource.PlayOneShot(clip, volume);
+        if (clip != null && audioSource != null)
+            audioSource.PlayOneShot(clip);
     }
-
-    AudioSource countSource;
 }

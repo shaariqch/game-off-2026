@@ -344,21 +344,27 @@
 
 .key {
     width: 300px;
-    overflow: hidden;
+    flex-shrink: 0;
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
     border-bottom-left-radius: 4px;
     border-bottom-right-radius: 4px;
+    border-left-width: 3px;
+    border-right-width: 3px;
+    border-top-width: 3px;
+    border-bottom-width: 3px;
+    border-left-color: rgba(0, 0, 0, 0);
+    border-right-color: rgba(0, 0, 0, 0);
+    border-top-color: rgba(0, 0, 0, 0);
+    border-bottom-color: rgba(0, 0, 0, 0);
     background-color: rgb(42, 36, 51);
     color: rgb(241, 230, 208);
+    transition-property: opacity, background-color, color;
+    transition-duration: 0.12s;
 }
 
 .key-content {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 300px;
-    bottom: 0;
+    flex-grow: 1;
     flex-direction: row;
     align-items: center;
     justify-content: center;
@@ -380,38 +386,22 @@
     height: 28px;
 }
 
-.key-fill {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 0;
-    overflow: hidden;
+/* buy is the gold key while nothing is happening; the key in use lights up gold, and the other one dims */
+#buy.key--idle,
+.key--active {
     background-color: rgb(227, 184, 102);
     color: rgb(27, 23, 36);
 }
 
-/* buy is the gold key while nothing is happening */
-#buy.key--idle .key-fill {
-    width: 100%;
-}
-
 .key--holding {
-    border-left-width: 3px;
-    border-right-width: 3px;
-    border-top-width: 3px;
-    border-bottom-width: 3px;
-    border-left-color: rgb(227, 184, 102);
-    border-right-color: rgb(227, 184, 102);
-    border-top-color: rgb(227, 184, 102);
-    border-bottom-color: rgb(227, 184, 102);
+    border-left-color: rgb(241, 230, 208);
+    border-right-color: rgb(241, 230, 208);
+    border-top-color: rgb(241, 230, 208);
+    border-bottom-color: rgb(241, 230, 208);
 }
 
-/* with a border the content box shrinks; keep the label where it was */
-.key--holding .key-content {
-    left: -3px;
-    top: -3px;
-    bottom: -3px;
+.key--other {
+    opacity: 0.45;
 }
 
 .key--has-count .key-count {
@@ -420,6 +410,85 @@
 
 .key--closed {
     opacity: 0.4;
+}
+
+/* the trade bar between the keys: buying fills from the left to the line in the middle, selling from the right */
+
+#trade {
+    flex-grow: 1;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 45px;
+}
+
+#trade-bar {
+    width: 440px;
+    height: 10px;
+    overflow: hidden;
+    background-color: rgba(27, 23, 36, 0.85);
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.18s;
+}
+
+.trade-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background-color: rgb(227, 184, 102);
+}
+
+#trade-fill-buy {
+    left: 0;
+}
+
+#trade-fill-sell {
+    right: 0;
+}
+
+#trade-mid {
+    position: absolute;
+    bottom: 37px;
+    left: 50%;
+    width: 4px;
+    height: 26px;
+    margin-left: -2px;
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+    border-bottom-right-radius: 2px;
+    background-color: rgb(241, 230, 208);
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.18s;
+}
+
+.trade--shown #trade-bar,
+.trade--shown #trade-mid {
+    opacity: 1;
+}
+
+#trade-result-row {
+    position: absolute;
+    bottom: 68px;
+    left: 0;
+    right: 0;
+    align-items: center;
+}
+
+#trade-result {
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    font-size: 26px;
+    color: rgb(227, 184, 102);
+    opacity: 0;
 }
 
 #skip {

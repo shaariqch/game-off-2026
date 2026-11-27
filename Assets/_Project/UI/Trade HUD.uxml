@@ -32,6 +32,16 @@
 
         <ui:VisualElement name="controls" picking-mode="Ignore">
             <ui:VisualElement name="buy" class="key" />
+            <ui:VisualElement name="trade" picking-mode="Ignore">
+                <ui:VisualElement name="trade-result-row" picking-mode="Ignore">
+                    <ui:Label name="trade-result" class="serif panel" text="Success!" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement name="trade-bar" picking-mode="Ignore">
+                    <ui:VisualElement name="trade-fill-buy" class="trade-fill" picking-mode="Ignore" />
+                    <ui:VisualElement name="trade-fill-sell" class="trade-fill" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement name="trade-mid" picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:VisualElement name="sell" class="key" />
         </ui:VisualElement>
 
