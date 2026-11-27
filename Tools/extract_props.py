@@ -56,7 +56,7 @@ JOBS = {
     ],
     # icon candidates for the HUD mockup (unit types, cash, battle, buy and sell), rendered to images by an eval
     r"E:\Game Assets\Synty\POLYGON - Icons Pack": [
-        r"re:PolygonIcons/Prefabs/SM_Icon_(Axe_0[12]|Shield_01|KnightHelmet_01|Armour_01|Crafting_Feather_01|Dagger_01|Sword_0[12]|Coin_0[1-3]|Coins_01|Arrow_0[1-5]|Arrow_Angled_01|Chevron_01|Crown_01|Banner_0[12]|Flag_01|Crafting_Bolt_01|Boots_01|Farm_01|Crop_01|Skull_01)\.prefab$",
+        r"re:PolygonIcons/Prefabs/SM_Icon_(Axe_0[12]|Shield_01|KnightHelmet_01|Armour_01|Crafting_Feather_01|Dagger_01|Sword_0[12]|Coin_0[1-3]|Coins_01|Arrow_0[1-5]|Arrow_Angled_01|Chevron_01|Crown_01|Banner_0[12]|Flag_01|Crafting_Bolt_01|Boots_01|Farm_01|Crop_01|Skull_01|Letter_0[12]|QuestionMark_01)\.prefab$",
     ],
     # every UI sound (the user's call, 2026-11-27): the HUD's clicks, ticks, coins and notices come from here
     os.path.join(os.environ.get("APPDATA", ""), r"Unity\Asset Store-5.x\Celeris Lab\AudioSound FX\The Complete UI Sound Effects Library.unitypackage"): [

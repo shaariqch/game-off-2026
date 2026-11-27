@@ -126,6 +126,29 @@
     opacity: 0.35;
 }
 
+/* known from a tip: a ring in the category's colour */
+.dot--tipped {
+    background-color: rgb(27, 23, 36);
+    border-left-width: 3px;
+    border-right-width: 3px;
+    border-top-width: 3px;
+    border-bottom-width: 3px;
+}
+
+.dot--tipped.dot--notice {
+    border-left-color: rgb(127, 196, 201);
+    border-right-color: rgb(127, 196, 201);
+    border-top-color: rgb(127, 196, 201);
+    border-bottom-color: rgb(127, 196, 201);
+}
+
+.dot--tipped.dot--invasion {
+    border-left-color: rgb(224, 101, 79);
+    border-right-color: rgb(224, 101, 79);
+    border-top-color: rgb(224, 101, 79);
+    border-bottom-color: rgb(224, 101, 79);
+}
+
 #battle-label {
     font-size: 16px;
     margin-right: 10px;
@@ -140,25 +163,41 @@
     color: rgb(227, 184, 102);
 }
 
-/* the unit list */
+/* the list: the market's units, the tip and the enemy's types. Kept narrow and short so it covers little of the
+   map; with the map focused it shrinks to the selected row. */
 
 #units {
     position: absolute;
     right: 22px;
     top: 85px;
-    width: 420px;
-    padding-top: 14px;
-    padding-left: 11px;
-    padding-right: 11px;
-    padding-bottom: 18px;
+    width: 300px;
+    padding-top: 6px;
+    padding-left: 6px;
+    padding-right: 6px;
+    padding-bottom: 6px;
+}
+
+.units--map-focus {
+    padding-top: 4px;
+    padding-bottom: 4px;
 }
 
 .unit-header {
     flex-direction: row;
-    padding-left: 22px;
-    padding-right: 22px;
-    padding-bottom: 2px;
-    font-size: 15px;
+    align-items: flex-end;
+    height: 22px;
+    padding-left: 12px;
+    padding-right: 12px;
+    font-size: 13px;
+}
+
+.list-rule {
+    height: 1px;
+    margin-top: 6px;
+    margin-bottom: 4px;
+    margin-left: 12px;
+    margin-right: 12px;
+    background-color: rgba(241, 230, 208, 0.18);
 }
 
 .col-name {
@@ -168,12 +207,12 @@
 }
 
 .col-held {
-    width: 70px;
+    width: 44px;
     -unity-text-align: middle-right;
 }
 
 .col-price {
-    width: 96px;
+    width: 62px;
     flex-direction: row;
     justify-content: flex-end;
     align-items: center;
@@ -183,10 +222,10 @@
 .unit-row {
     flex-direction: row;
     align-items: center;
-    height: 56px;
-    margin-top: 4px;
-    padding-left: 22px;
-    padding-right: 22px;
+    height: 34px;
+    margin-top: 2px;
+    padding-left: 10px;
+    padding-right: 10px;
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
     border-bottom-left-radius: 4px;
@@ -202,18 +241,18 @@
 }
 
 .unit-icon {
-    width: 34px;
-    height: 34px;
-    margin-right: 14px;
+    width: 24px;
+    height: 24px;
+    margin-right: 10px;
 }
 
 .unit-name {
-    font-size: 19px;
+    font-size: 16px;
 }
 
 .unit-held,
 .unit-price {
-    font-size: 24px;
+    font-size: 19px;
 }
 
 .unit-held--none {
@@ -221,10 +260,9 @@
 }
 
 .trend {
-    width: 16px;
+    width: 10px;
+    height: 10px;
     margin-left: 4px;
-    font-size: 13px;
-    -unity-text-align: middle-center;
 }
 
 .unit-row--selected {
@@ -238,6 +276,7 @@
 
 /* with the map focused, the selection shows as an outline */
 .units--map-focus .unit-row--selected {
+    margin-top: 0;
     background-color: rgba(0, 0, 0, 0);
     color: rgb(241, 230, 208);
     border-left-color: rgb(227, 184, 102);
@@ -250,12 +289,14 @@
     color: rgb(181, 172, 159);
 }
 
+/* the selected row's description, under it */
 #description {
-    margin-top: 8px;
-    margin-left: 22px;
-    margin-right: 22px;
+    padding-top: 3px;
+    padding-bottom: 5px;
+    padding-left: 46px;
+    padding-right: 10px;
     white-space: normal;
-    font-size: 17px;
+    font-size: 14px;
 }
 
 /* notices pinned to places on the map */
@@ -310,6 +351,14 @@
     border-top-right-radius: 6px;
     border-bottom-left-radius: 6px;
     border-bottom-right-radius: 6px;
+}
+
+/* an event still to come, known from a tip: a ring, as on the timeline */
+.notice-dot--pending {
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
 }
 
 .notice-text {

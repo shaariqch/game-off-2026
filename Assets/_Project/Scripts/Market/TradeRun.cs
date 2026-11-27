@@ -20,6 +20,8 @@ public class TradeRun : MonoBehaviour
 {
     public enum Focus { Map, Units }
     public enum Side { Buy, Sell }
+    /// <summary>What a row of the list is: a unit type on the market, the tip, or a type the enemy has brought.</summary>
+    public enum RowKind { Unit, Tip, Enemy }
     public enum OrderState { Idle, Holding, Counting }
     /// <summary>Something a Shift key did, for the HUD's feedback.</summary>
     public enum KeyMoment
@@ -38,12 +40,20 @@ public class TradeRun : MonoBehaviour
         Cancelled,
     }
 
+    /// <summary>One unit type in the coming battle's enemy army. Everyone sees the type; the count is scouted.</summary>
+    public sealed class EnemyGroup
+    {
+        public UnitType type;
+        public int count;
+        public bool scouted;
+    }
+
     public sealed class Order
     {
         public Side side;
         public OrderState state;
-        /// <summary>Index of the unit type it's for.</summary>
-        public int unit;
+        /// <summary>The list row it's for (see <see cref="KindOf"/>).</summary>
+        public int row;
         public int count;
         /// <summary>The count has reached what can be afforded or is held.</summary>
         public bool capped;
@@ -69,6 +79,18 @@ public class TradeRun : MonoBehaviour
     [SerializeField] Market.Settings marketSettings = Market.Settings.Default;
     [Tooltip("Placeholder events, fired at fixed times in every trading phase.")]
     [SerializeField] List<MarketEvent> events = new List<MarketEvent>();
+
+    [Header("Intel")]
+    [Tooltip("Cash for a tip, which reveals one random event still to come in this trading phase.")]
+    [SerializeField, Min(0)] int tipPrice = 20;
+    [Tooltip("Cash to scout one enemy unit type, which shows how many of it the enemy has.")]
+    [SerializeField, Min(0)] int scoutPrice = 15;
+
+    [Header("Enemy (placeholder until battles are joined up)")]
+    [Tooltip("What the enemy army is worth at the first battle, and what each later battle adds, in unit cost.")]
+    [SerializeField] Vector2 enemyWorth = new Vector2(240f, 120f);
+    [Tooltip("How many unit types the enemy brings, at least and at most.")]
+    [SerializeField] Vector2Int enemyTypes = new Vector2Int(2, 3);
 
     [Header("Shift keys")]
     [Tooltip("Seconds between letting go and the trade going through.")]
@@ -113,12 +135,29 @@ public class TradeRun : MonoBehaviour
 
     /// <summary>An event has just happened.</summary>
     public event Action<MarketEvent> EventStarted;
-    /// <summary>A trade went through: side, unit index, how many.</summary>
+    /// <summary>A trade went through: side, list row, how many (units, tips or scouted types).</summary>
     public event Action<Side, int, int> Traded;
     /// <summary>A Shift key did something: side, what, and the order's count after it.</summary>
     public event Action<Side, KeyMoment, int> KeyMoved;
+    /// <summary>A tip has revealed an event still to come.</summary>
+    public event Action<MarketEvent> Tipped;
 
     int[] held;
+    int runSeed;
+    readonly List<EnemyGroup> enemy = new List<EnemyGroup>();
+    readonly HashSet<MarketEvent> revealed = new HashSet<MarketEvent>();
+    readonly List<MarketEvent> hidden = new List<MarketEvent>();
+
+    public IReadOnlyList<EnemyGroup> Enemy => enemy;
+    public int TipPrice => tipPrice;
+    public int ScoutPrice => scoutPrice;
+    /// <summary>Units, then the tip, then the enemy's types.</summary>
+    public int RowCount => UnitCount + 1 + enemy.Count;
+    public RowKind KindOf(int row) => row < UnitCount ? RowKind.Unit : row == UnitCount ? RowKind.Tip : RowKind.Enemy;
+    public EnemyGroup EnemyAt(int row) => enemy[row - UnitCount - 1];
+    /// <summary>Shown on the timeline before it happens: known from the start, or revealed by a tip.</summary>
+    public bool IsKnown(MarketEvent marketEvent) => marketEvent.known || revealed.Contains(marketEvent);
+    public bool WasTipped(MarketEvent marketEvent) => revealed.Contains(marketEvent);
 
     public int Held(int unit) => held[unit];
     public int UnitCount => Market.listings.Count;
@@ -138,11 +177,10 @@ public class TradeRun : MonoBehaviour
 
     public void NewRun()
     {
-        int runSeed = seed != 0 ? seed : UnityEngine.Random.Range(1, int.MaxValue);
+        runSeed = seed != 0 ? seed : UnityEngine.Random.Range(1, int.MaxValue);
         Market = new Market(units, marketSettings, runSeed);
         Cash = startingCash;
         held = new int[Market.listings.Count];
-        Selected = Mathf.Min(Selected, held.Length - 1);
         Battle = 1;
         StartPhase();
         Debug.Log($"[Trade] new run, seed {runSeed}, cash {Cash}");
@@ -154,6 +192,53 @@ public class TradeRun : MonoBehaviour
         AtBattle = false;
         Reset(buy);
         Reset(sell);
+        revealed.Clear();
+        MakeEnemy();
+        Selected = Mathf.Clamp(Selected, 0, RowCount - 1);
+    }
+
+    /// <summary>
+    /// A placeholder enemy for the coming battle: a few random types sharing its worth, which grows each battle.
+    /// </summary>
+    void MakeEnemy()
+    {
+        enemy.Clear();
+        var random = new System.Random(unchecked(runSeed * 31 + Battle));
+        var types = new List<UnitType>();
+        foreach (var listing in Market.listings)
+            types.Add(listing.type);
+        int typeCount = Mathf.Clamp(random.Next(enemyTypes.x, enemyTypes.y + 1), 1, types.Count);
+        var shares = new float[typeCount];
+        float total = 0f;
+        for (int i = 0; i < typeCount; i++)
+        {
+            int pick = random.Next(i, types.Count);
+            (types[i], types[pick]) = (types[pick], types[i]);
+            shares[i] = 0.5f + (float)random.NextDouble();
+            total += shares[i];
+        }
+        float worth = enemyWorth.x + enemyWorth.y * (Battle - 1);
+        for (int i = 0; i < typeCount; i++)
+        {
+            int count = Mathf.Max(1, Mathf.RoundToInt(worth * shares[i] / total / types[i].cost));
+            enemy.Add(new EnemyGroup { type = types[i], count = count });
+        }
+        // in the list's order, so the enemy's rows line up with the market's
+        enemy.Sort((a, b) => Market.IndexOf(a.type).CompareTo(Market.IndexOf(b.type)));
+        var parts = new List<string>();
+        foreach (var group in enemy)
+            parts.Add(group.count + " " + group.type.name);
+        Debug.Log($"[Trade] battle {Battle} enemy: {string.Join(", ", parts)}");
+    }
+
+    /// <summary>Events still to come in this phase that the timeline doesn't show yet.</summary>
+    List<MarketEvent> Hidden()
+    {
+        hidden.Clear();
+        foreach (var marketEvent in events)
+            if (marketEvent.time > PhaseTime && !IsKnown(marketEvent))
+                hidden.Add(marketEvent);
+        return hidden;
     }
 
     void Update()
@@ -233,7 +318,7 @@ public class TradeRun : MonoBehaviour
         }
 
         int move = (keyboard.downArrowKey.wasPressedThisFrame ? 1 : 0) - (keyboard.upArrowKey.wasPressedThisFrame ? 1 : 0);
-        int next = Mathf.Clamp(Selected + move, 0, UnitCount - 1);
+        int next = Mathf.Clamp(Selected + move, 0, RowCount - 1);
         if (next != Selected)
         {
             // a trade still counting down for the old selection goes through now
@@ -254,7 +339,12 @@ public class TradeRun : MonoBehaviour
                 KeyMoved?.Invoke(other.side, KeyMoment.Cancelled, 0);
                 mine.spent = true;
             }
-            else if (mine.state == OrderState.Counting && mine.unit == Selected)
+            else if (mine.side == Side.Sell && KindOf(Selected) != RowKind.Unit)
+            {
+                // tips and scouting can only be bought; the sell key does nothing on them
+                mine.spent = true;
+            }
+            else if (mine.state == OrderState.Counting && mine.row == Selected)
             {
                 // carry on counting from where it was, without the tap pause
                 mine.state = OrderState.Holding;
@@ -273,7 +363,7 @@ public class TradeRun : MonoBehaviour
                 else
                 {
                     mine.state = OrderState.Holding;
-                    mine.unit = Selected;
+                    mine.row = Selected;
                     mine.count = 1;
                     mine.heldFor = 0f;
                     mine.countDebt = 0f;
@@ -304,7 +394,7 @@ public class TradeRun : MonoBehaviour
             return;
         float rate = Mathf.Lerp(countRate.x, countRate.y, Mathf.Clamp01((mine.heldFor - tapGrace) / rampTime));
         mine.countDebt += rate * dt;
-        int cap = Cap(mine.side, mine.unit);
+        int cap = Cap(mine.side, mine.row);
         while (mine.countDebt >= 1f)
         {
             mine.countDebt -= 1f;
@@ -333,8 +423,21 @@ public class TradeRun : MonoBehaviour
             Complete(order);
     }
 
-    /// <summary>How many the order could reach now: what the cash buys, or what is held.</summary>
-    public int Cap(Side side, int unit) => side == Side.Buy ? Market.Affordable(unit, Cash) : held[unit];
+    /// <summary>How many the order could reach now: what the cash buys (and, for tips, what is left to reveal), or what is held.</summary>
+    public int Cap(Side side, int row)
+    {
+        switch (KindOf(row))
+        {
+            case RowKind.Unit:
+                return side == Side.Buy ? Market.Affordable(row, Cash) : held[row];
+            case RowKind.Tip:
+                if (side == Side.Sell) return 0;
+                return Mathf.Min(tipPrice > 0 ? Cash / tipPrice : 99, Hidden().Count);
+            default:
+                var group = EnemyAt(row);
+                return side == Side.Buy && !group.scouted && Cash >= scoutPrice ? 1 : 0;
+        }
+    }
 
     /// <summary>0 while held, then 0 to 1 through the countdown.</summary>
     public float Progress(Order order) =>
@@ -348,8 +451,36 @@ public class TradeRun : MonoBehaviour
             Reset(order);
             return;
         }
-        int unit = order.unit;
-        if (order.side == Side.Buy)
+        int unit = order.row;
+        if (KindOf(order.row) == RowKind.Tip)
+        {
+            var left = Hidden();
+            int count = Mathf.Min(order.count, left.Count, tipPrice > 0 ? Cash / tipPrice : 99);
+            for (int i = 0; i < count; i++)
+            {
+                int pick = UnityEngine.Random.Range(0, left.Count);
+                var marketEvent = left[pick];
+                left.RemoveAt(pick);
+                revealed.Add(marketEvent);
+                Cash -= tipPrice;
+                Debug.Log($"[Trade] tip: {marketEvent.text} (at {marketEvent.time:0} s)");
+                Tipped?.Invoke(marketEvent);
+            }
+            Traded?.Invoke(Side.Buy, order.row, count);
+        }
+        else if (KindOf(order.row) == RowKind.Enemy)
+        {
+            var group = EnemyAt(order.row);
+            bool scout = !group.scouted && Cash >= scoutPrice;
+            if (scout)
+            {
+                group.scouted = true;
+                Cash -= scoutPrice;
+                Debug.Log($"[Trade] scouted: the enemy has {group.count} {group.type.name}");
+            }
+            Traded?.Invoke(Side.Buy, order.row, scout ? 1 : 0);
+        }
+        else if (order.side == Side.Buy)
         {
             var (bought, spent) = Market.Buy(unit, order.count, Cash);
             Cash -= spent;

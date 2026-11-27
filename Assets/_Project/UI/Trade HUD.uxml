@@ -21,13 +21,7 @@
         </ui:VisualElement>
 
         <ui:VisualElement name="units" class="panel">
-            <ui:VisualElement class="unit-header muted">
-                <ui:VisualElement class="col-name" />
-                <ui:Label class="col-held" text="Held" />
-                <ui:Label class="col-price" text="Price" />
-            </ui:VisualElement>
             <ui:VisualElement name="unit-rows" />
-            <ui:Label name="description" class="muted" />
         </ui:VisualElement>
 
         <ui:VisualElement name="controls" picking-mode="Ignore">

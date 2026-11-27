@@ -18856,8 +18856,11 @@ MonoBehaviour:
   mapCamera: {fileID: 1491646144}
   cashIcon: {fileID: 2800000, guid: db59ba709f87a3a4e8a51313248c4c27, type: 3}
   battleIcon: {fileID: 2800000, guid: 0273175288e4a274c90e994ae8033874, type: 3}
+  tipIcon: {fileID: 2800000, guid: 82bdc4654d4ba0c4a81714ded445549e, type: 3}
+  tipDescription: Reveals an event before it happens.
+  enemyDescription: Scouting shows how many they have brought.
   noticeBand: {x: 96, y: 650}
-  noticeRightLimit: 990
+  noticeRightLimit: 1108
   noticeColour: {r: 0.498, g: 0.769, b: 0.788, a: 1}
   invasionColour: {r: 0.878, g: 0.396, b: 0.31, a: 1}
   tradeHold: 0.9
@@ -18929,14 +18932,14 @@ MonoBehaviour:
     text: Stonewatch Castle mans its walls.
     affects: {fileID: 11400000, guid: 5dfe9b2bdcccc4a4aa5be328096a2f35, type: 2}
     strength: 0.6
-    known: 1
+    known: 0
   - time: 44
     category: 1
     place: Highfield
     text: A royal hunt rides out from Highfield.
     affects: {fileID: 11400000, guid: fed6eb1591a08494baa5f0623125db68, type: 2}
     strength: 0.5
-    known: 1
+    known: 0
   - time: 58
     category: 0
     place: Millbrook
@@ -18944,6 +18947,10 @@ MonoBehaviour:
     affects: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
     strength: 0.6
     known: 1
+  tipPrice: 20
+  scoutPrice: 15
+  enemyWorth: {x: 240, y: 120}
+  enemyTypes: {x: 2, y: 3}
   countdown: 1.5
   tapGrace: 0.25
   countRate: {x: 4, y: 20}

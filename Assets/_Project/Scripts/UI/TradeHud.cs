@@ -3,7 +3,8 @@ using UnityEngine;
 using UnityEngine.UIElements;
 
 /// <summary>
-/// Shows a <see cref="TradeRun"/> over the map: cash and the timeline along the top, the unit list on the right,
+/// Shows a <see cref="TradeRun"/> over the map: cash and the timeline along the top, the list on the right (the
+/// market's units, the tip, and the enemy's types to scout),
 /// event notices pinned to their places, and the two Shift keys along the bottom. Layout and look are in
 /// UI/Trade HUD.uxml and .uss; this only fills them in.
 /// </summary>
@@ -15,6 +16,13 @@ public class TradeHud : MonoBehaviour
     [SerializeField] Camera mapCamera;
     [SerializeField] Texture2D cashIcon;
     [SerializeField] Texture2D battleIcon;
+
+    [Header("List")]
+    [SerializeField] Texture2D tipIcon;
+    [Tooltip("Shown under the Tip row when it's selected.")]
+    [SerializeField] string tipDescription = "Reveals an event before it happens.";
+    [Tooltip("Shown under an enemy row when it's selected.")]
+    [SerializeField] string enemyDescription = "Scouting shows how many they have brought.";
 
     [Header("Notices")]
     [Tooltip("Notices above this or below the second (reference pixels from the top) show as a ping on that edge instead.")]
@@ -30,6 +38,7 @@ public class TradeHud : MonoBehaviour
 
     sealed class Row
     {
+        public TradeRun.RowKind kind;
         public VisualElement root;
         public Label held, price;
         public HudShape trend;
@@ -46,8 +55,10 @@ public class TradeHud : MonoBehaviour
     {
         public MarketEvent marketEvent;
         public MapPlace place;
-        public VisualElement root, panel, ping;
+        public VisualElement root, panel, ping, dot;
         public HudShape chevron;
+        /// <summary>Known from a tip and still to come.</summary>
+        public bool pending;
     }
 
     VisualElement hud, units, unitRows, eventDots, now, trackBehind, timeline, notices;
@@ -57,6 +68,9 @@ public class TradeHud : MonoBehaviour
     float tradedAt = float.NegativeInfinity;
     Label cashValue, battleLabel, description;
     readonly List<Row> rows = new List<Row>();
+    // the list's group headers, shown only while the list has focus
+    readonly List<VisualElement> listExtras = new List<VisualElement>();
+    int rowsForBattle = -1;
     readonly List<(MarketEvent marketEvent, VisualElement dot)> dots = new List<(MarketEvent, VisualElement)>();
     readonly List<Notice> shown = new List<Notice>();
     Key buyKey, sellKey;
@@ -83,7 +97,6 @@ public class TradeHud : MonoBehaviour
         notices = hud.Q("notices");
         cashValue = hud.Q<Label>("cash-value");
         battleLabel = hud.Q<Label>("battle-label");
-        description = hud.Q<Label>("description");
         hud.Q("cash-icon").style.backgroundImage = cashIcon;
         hud.Q("battle-icon").style.backgroundImage = battleIcon;
         trade = hud.Q("trade");
@@ -98,6 +111,7 @@ public class TradeHud : MonoBehaviour
         shown.Clear();
         builtForBattle = -1;
         run.EventStarted += OnEventStarted;
+        run.Tipped += OnTipped;
         run.Traded += OnTraded;
         tradedAt = float.NegativeInfinity;
         built = true;
@@ -108,28 +122,51 @@ public class TradeHud : MonoBehaviour
         if (run != null)
         {
             run.EventStarted -= OnEventStarted;
+            run.Tipped -= OnTipped;
             run.Traded -= OnTraded;
         }
         built = false;
     }
 
+    /// <summary>
+    /// The list, one row per <see cref="TradeRun"/> row: the market's units under Held and Price, then the tip, then
+    /// the enemy's types under Count and Scout. The selected row's description sits under it.
+    /// </summary>
     void BuildRows()
     {
         unitRows.Clear();
         rows.Clear();
-        for (int i = 0; i < run.UnitCount; i++)
+        listExtras.Clear();
+        unitRows.Add(Header("", "Held", "Price"));
+        for (int i = 0; i < run.RowCount; i++)
         {
-            var type = run.Unit(i);
-            var row = new Row { root = new VisualElement() };
+            var kind = run.KindOf(i);
+            if (kind == TradeRun.RowKind.Tip)
+            {
+                var rule = new VisualElement();
+                rule.AddToClassList("list-rule");
+                unitRows.Add(rule);
+                listExtras.Add(rule);
+            }
+            else if (kind == TradeRun.RowKind.Enemy && run.KindOf(i - 1) != TradeRun.RowKind.Enemy)
+                unitRows.Add(Header("Enemy", "Count", "Scout"));
+
+            var (iconImage, title) = kind switch
+            {
+                TradeRun.RowKind.Unit => (run.Unit(i).icon, run.Unit(i).name),
+                TradeRun.RowKind.Tip => (tipIcon, "Tip"),
+                _ => (run.EnemyAt(i).type.icon, run.EnemyAt(i).type.name),
+            };
+            var row = new Row { kind = kind, root = new VisualElement() };
             row.root.AddToClassList("unit-row");
             var name = new VisualElement();
             name.AddToClassList("col-name");
             var icon = new VisualElement();
             icon.AddToClassList("icon");
             icon.AddToClassList("unit-icon");
-            icon.style.backgroundImage = type.icon;
+            icon.style.backgroundImage = iconImage;
             name.Add(icon);
-            var label = new Label(type.name);
+            var label = new Label(title);
             label.AddToClassList("serif");
             label.AddToClassList("unit-name");
             name.Add(label);
@@ -149,15 +186,35 @@ public class TradeHud : MonoBehaviour
             price.Add(row.price);
             row.trend = new HudShape(HudShape.Kind.TriangleUp);
             row.trend.AddToClassList("trend");
-            row.trend.style.width = 12;
-            row.trend.style.height = 12;
-            row.trend.style.marginLeft = 5;
             price.Add(row.trend);
             row.root.Add(price);
 
             unitRows.Add(row.root);
             rows.Add(row);
         }
+        description = new Label();
+        description.name = "description";
+        description.AddToClassList("muted");
+        unitRows.Add(description);
+        rowsForBattle = run.Battle;
+    }
+
+    VisualElement Header(string title, string held, string price)
+    {
+        var header = new VisualElement();
+        header.AddToClassList("unit-header");
+        header.AddToClassList("muted");
+        var name = new Label(title);
+        name.AddToClassList("col-name");
+        header.Add(name);
+        var heldLabel = new Label(held);
+        heldLabel.AddToClassList("col-held");
+        header.Add(heldLabel);
+        var priceLabel = new Label(price);
+        priceLabel.AddToClassList("col-price");
+        header.Add(priceLabel);
+        listExtras.Add(header);
+        return header;
     }
 
     Key BuildKey(VisualElement root, TradeRun.Side side)
@@ -218,13 +275,28 @@ public class TradeHud : MonoBehaviour
 
     void OnEventStarted(MarketEvent marketEvent)
     {
+        // a notice a tip put up ahead of time now shows as happening
+        foreach (var notice in shown)
+        {
+            if (notice.marketEvent != marketEvent)
+                continue;
+            SetPending(notice, false);
+            return;
+        }
+        ShowNotice(marketEvent, false);
+    }
+
+    void OnTipped(MarketEvent marketEvent) => ShowNotice(marketEvent, true);
+
+    void ShowNotice(MarketEvent marketEvent, bool pending)
+    {
         var place = MapPlace.Find(marketEvent.place);
         if (place == null)
         {
             Debug.LogWarning($"No MapPlace called {marketEvent.place} for the event \"{marketEvent.text}\".", this);
             return;
         }
-        var colour = marketEvent.category == MarketEvent.Category.Invasion ? invasionColour : noticeColour;
+        var colour = Colour(marketEvent);
         var notice = new Notice { marketEvent = marketEvent, place = place, root = new VisualElement() };
         notice.root.AddToClassList("notice");
         notice.root.pickingMode = PickingMode.Ignore;
@@ -234,10 +306,11 @@ public class TradeHud : MonoBehaviour
         notice.panel = new VisualElement();
         notice.panel.AddToClassList("panel");
         notice.panel.AddToClassList("notice-panel");
-        var dot = new VisualElement();
-        dot.AddToClassList("notice-dot");
-        dot.style.backgroundColor = colour;
-        notice.panel.Add(dot);
+        notice.dot = new VisualElement();
+        notice.dot.AddToClassList("notice-dot");
+        notice.dot.style.borderLeftColor = notice.dot.style.borderRightColor =
+            notice.dot.style.borderTopColor = notice.dot.style.borderBottomColor = colour;
+        notice.panel.Add(notice.dot);
         var text = new Label(marketEvent.text);
         text.AddToClassList("notice-text");
         notice.panel.Add(text);
@@ -253,10 +326,22 @@ public class TradeHud : MonoBehaviour
         notice.chevron.SetColour(colour);
         notice.ping.Add(notice.chevron);
 
+        SetPending(notice, pending);
         notices.Add(notice.root);
         notices.Add(notice.ping);
         shown.Add(notice);
     }
+
+    /// <summary>A notice for an event still to come shows its dot as a ring, as the timeline does.</summary>
+    void SetPending(Notice notice, bool pending)
+    {
+        notice.pending = pending;
+        notice.dot.EnableInClassList("notice-dot--pending", pending);
+        notice.dot.style.backgroundColor = pending ? Color.clear : Colour(notice.marketEvent);
+    }
+
+    Color Colour(MarketEvent marketEvent) =>
+        marketEvent.category == MarketEvent.Category.Invasion ? invasionColour : noticeColour;
 
     void LateUpdate()
     {
@@ -264,6 +349,8 @@ public class TradeHud : MonoBehaviour
             return;
         if (builtForBattle != run.Battle || dots.Count != run.Events.Count)
             BuildDots();
+        if (rowsForBattle != run.Battle || rows.Count != run.RowCount)
+            BuildRows();
 
         hud.EnableInClassList("hud--battle", run.AtBattle);
         cashValue.text = run.Cash.ToString();
@@ -274,27 +361,59 @@ public class TradeHud : MonoBehaviour
         foreach (var (marketEvent, dot) in dots)
         {
             bool happened = run.HasHappened(marketEvent);
-            dot.style.display = marketEvent.known || happened ? DisplayStyle.Flex : DisplayStyle.None;
+            dot.style.display = run.IsKnown(marketEvent) || happened ? DisplayStyle.Flex : DisplayStyle.None;
             dot.EnableInClassList("dot--past", happened);
+            dot.EnableInClassList("dot--tipped", run.WasTipped(marketEvent));
         }
         battleLabel.text = $"Battle {run.Battle} of {run.BattlesPerRun}";
         timeline.EnableInClassList("timeline--battle", run.AtBattle);
 
-        units.EnableInClassList("units--map-focus", run.CurrentFocus == TradeRun.Focus.Map);
+        bool mapFocus = run.CurrentFocus == TradeRun.Focus.Map;
+        units.EnableInClassList("units--map-focus", mapFocus);
         for (int i = 0; i < rows.Count; i++)
         {
             var row = rows[i];
-            var listing = run.Market[i];
-            int held = run.Held(i);
-            row.root.EnableInClassList("unit-row--selected", i == run.Selected);
-            row.held.text = held.ToString();
-            row.held.EnableInClassList("unit-held--none", held == 0);
-            row.price.text = listing.Price.ToString();
-            row.trend.style.visibility = listing.Trend == 0 ? Visibility.Hidden : Visibility.Visible;
-            row.trend.Shape = listing.Trend < 0 ? HudShape.Kind.TriangleDown : HudShape.Kind.TriangleUp;
+            bool selected = i == run.Selected;
+            row.root.EnableInClassList("unit-row--selected", selected);
+            // with the map focused the list shrinks to the selected row, so it covers less of the map
+            row.root.style.display = mapFocus && !selected ? DisplayStyle.None : DisplayStyle.Flex;
+            int trend = 0;
+            switch (row.kind)
+            {
+                case TradeRun.RowKind.Unit:
+                    int held = run.Held(i);
+                    row.held.text = held.ToString();
+                    row.held.EnableInClassList("unit-held--none", held == 0);
+                    row.price.text = run.Market[i].Price.ToString();
+                    trend = run.Market[i].Trend;
+                    break;
+                case TradeRun.RowKind.Tip:
+                    row.held.text = "";
+                    row.price.text = run.TipPrice.ToString();
+                    break;
+                default:
+                    var group = run.EnemyAt(i);
+                    row.held.text = group.scouted ? group.count.ToString() : "?";
+                    row.held.EnableInClassList("unit-held--none", !group.scouted);
+                    row.price.text = group.scouted ? "" : run.ScoutPrice.ToString();
+                    break;
+            }
+            row.trend.style.visibility = trend == 0 ? Visibility.Hidden : Visibility.Visible;
+            row.trend.Shape = trend < 0 ? HudShape.Kind.TriangleDown : HudShape.Kind.TriangleUp;
             row.trend.MarkDirtyRepaint();
         }
-        description.text = run.Unit(run.Selected).description;
+        foreach (var extra in listExtras)
+            extra.style.display = mapFocus ? DisplayStyle.None : DisplayStyle.Flex;
+        var selectedRow = rows[run.Selected];
+        description.text = selectedRow.kind switch
+        {
+            TradeRun.RowKind.Unit => run.Unit(run.Selected).description,
+            TradeRun.RowKind.Tip => tipDescription,
+            _ => enemyDescription,
+        };
+        description.style.display = mapFocus ? DisplayStyle.None : DisplayStyle.Flex;
+        if (unitRows.IndexOf(description) != unitRows.IndexOf(selectedRow.root) + 1)
+            description.PlaceInFront(selectedRow.root);
 
         ShowKey(buyKey, run.buy, run.sell);
         ShowKey(sellKey, run.sell, run.buy);
@@ -310,7 +429,9 @@ public class TradeHud : MonoBehaviour
         key.root.EnableInClassList("key--holding", order.state == TradeRun.OrderState.Holding);
         key.root.EnableInClassList("key--other", idle && other.state != TradeRun.OrderState.Idle);
         key.root.EnableInClassList("key--has-count", !idle);
-        key.root.EnableInClassList("key--closed", run.AtBattle);
+        // tips and scouting can only be bought
+        bool noSelling = order.side == TradeRun.Side.Sell && idle && run.KindOf(run.Selected) != TradeRun.RowKind.Unit;
+        key.root.EnableInClassList("key--closed", run.AtBattle || noSelling);
         key.count.text = order.side == TradeRun.Side.Buy ? "+" + order.count : "−" + order.count;
         key.arrow.MarkDirtyRepaint();
     }
@@ -357,8 +478,9 @@ public class TradeHud : MonoBehaviour
         for (int i = shown.Count - 1; i >= 0; i--)
         {
             var notice = shown[i];
-            // a notice stays up while its event still moves the market
-            if (run.Market.Strength(notice.marketEvent) <= 0f || notice.place == null)
+            // a notice stays up while its event is still to come (known from a tip) or still moves the market
+            bool over = run.HasHappened(notice.marketEvent) && run.Market.Strength(notice.marketEvent) <= 0f;
+            if (over || notice.place == null)
             {
                 notice.root.RemoveFromHierarchy();
                 notice.ping.RemoveFromHierarchy();
