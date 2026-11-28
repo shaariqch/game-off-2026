@@ -435,6 +435,14 @@ public class TradeHud : MonoBehaviour
                     row.held.EnableInClassList("unit-held--none", held == 0);
                     row.price.text = run.Market[i].Price.ToString();
                     trend = run.Market[i].Trend;
+                    // while a key is counting on this row, the price shows where the order will push it
+                    var order = run.Active;
+                    if (order != null && order.row == i && order.count > 0)
+                    {
+                        bool buying = order.side == TradeRun.Side.Buy;
+                        row.price.text = run.Market.PriceAfter(i, buying ? order.count : -order.count).ToString();
+                        trend = buying ? 1 : -1;
+                    }
                     break;
                 case TradeRun.RowKind.Tip:
                     row.held.text = "";

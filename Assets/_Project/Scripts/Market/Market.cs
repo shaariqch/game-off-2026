@@ -18,7 +18,7 @@ public sealed class Market
     [Serializable]
     public struct Settings
     {
-        [Tooltip("How far one unit bought raises its type's price factor (0.02 is 2 % of its cost).")]
+        [Tooltip("How far one unit bought raises its type's price factor (0.06 is 6 % of its cost). High enough that holding a key to buy a lot visibly pumps the price.")]
         public float buyImpact;
         [Tooltip("How far one unit sold lowers its type's price factor.")]
         public float sellImpact;
@@ -37,8 +37,8 @@ public sealed class Market
 
         public static Settings Default => new Settings
         {
-            buyImpact = 0.015f,
-            sellImpact = 0.015f,
+            buyImpact = 0.06f,
+            sellImpact = 0.06f,
             pull = 0.05f,
             drift = 0.012f,
             factorRange = new Vector2(0.3f, 3f),
@@ -175,6 +175,20 @@ public sealed class Market
             listing.factor = Mathf.Max(listing.factor - settings.sellImpact, settings.factorRange.x);
         }
         return made;
+    }
+
+    /// <summary>
+    /// Where a type's price will land once <paramref name="units"/> more are bought (or, negative, sold): each unit
+    /// bought pushes it up and each sold pushes it down, so the list can show the price climbing while a key is held.
+    /// </summary>
+    public int PriceAfter(int index, int units)
+    {
+        var listing = listings[index];
+        float factor = units >= 0
+            ? Mathf.Min(listing.factor + settings.buyImpact * units, settings.factorRange.y)
+            : Mathf.Max(listing.factor + settings.sellImpact * units, settings.factorRange.x);
+        float total = Mathf.Clamp(factor + listing.eventPush, settings.factorRange.x, settings.factorRange.y);
+        return Mathf.Max(1, Mathf.RoundToInt(listing.type.cost * total));
     }
 
     /// <summary>How many units <paramref name="cash"/> buys now, counting the price rising with each one.</summary>

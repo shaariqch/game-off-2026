@@ -19935,8 +19935,8 @@ MonoBehaviour:
   pace: 0.4
   seed: 0
   marketSettings:
-    buyImpact: 0.015
-    sellImpact: 0.015
+    buyImpact: 0.06
+    sellImpact: 0.06
     pull: 0.05
     drift: 0.012
     factorRange: {x: 0.3, y: 3}
@@ -20074,6 +20074,7 @@ MonoBehaviour:
   raidPay: 1.2
   tipPrice: 20
   scoutPrice: 15
+  intelPriceRise: 1.5
   winPay: 0.5
   enemyWorth: {x: 240, y: 120}
   enemyTypes: {x: 2, y: 3}
