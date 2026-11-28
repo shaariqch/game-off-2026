@@ -49,18 +49,22 @@ MonoBehaviour:
     rotation: {x: 0, y: 20, z: 90}
   mount: {fileID: 0}
   visualScale: 1
-  idleClip: {fileID: 3215575822887921774, guid: ed8560f44bf9d4b48b00a743e934cf99, type: 3}
-  walkClip: {fileID: 6048701035611563356, guid: 6f2f17a5242e38648b83ee303844b46c, type: 3}
-  runClip: {fileID: 4763494864668633848, guid: 4dcfcd030150f2e408b985ae4c109387, type: 3}
-  walkClipSpeed: 1.4
-  runClipSpeed: 3.8
+  idleClip: {fileID: 6417901475737995274, guid: 3da4d4ab4b627ac4c9af1a99dc96164c, type: 3}
+  walkClip: {fileID: 3094330708855449807, guid: 2d87094962c8b48478651fa8fe1f7a5a, type: 3}
+  runClip: {fileID: 3094330708855449807, guid: 40786e67f3ceb094b9c00543f295cb5f, type: 3}
+  walkClipSpeed: 1.9
+  runClipSpeed: 3.9
   attackClips:
-  - {fileID: 6976764880961377414, guid: 2bc84587487ff2e449187e4dd254b9ca, type: 3}
-  - {fileID: -4126027623530713511, guid: 2aa8955f01ff41d4ab3a673b9d8bc151, type: 3}
-  shootClip: {fileID: 1827226128182048838, guid: 70ecfbfbbbb4aee4797ded1679966c6d, type: 3}
+  - {fileID: 3094330708855449807, guid: 408142c06e2d48c4db8065d1fbbcc8eb, type: 3}
+  - {fileID: 3094330708855449807, guid: beb43ecd0c676ec4ca7ee96c05c427be, type: 3}
+  shootClip: {fileID: 7400000, guid: 19eb0557216e8d0438e4066992049d7f, type: 2}
   hitClips:
-  - {fileID: 1827226128182048838, guid: b4bb330a0f98de947937f4ba0be58a5c, type: 3}
+  - {fileID: 6709979810834360995, guid: 14f4643252082b340b2056871a5469ce, type: 3}
+  - {fileID: 4177537622006943212, guid: eadd529223a59f14c8ea02ce0f365636, type: 3}
   knockbackClips:
-  - {fileID: 1827226128182048838, guid: 496548554d4f86e4298aa6d11a7b6f51, type: 3}
+  - {fileID: 7400000, guid: cc8f220a8f514dc4f88d0d46474ab37c, type: 2}
   deathClips:
-  - {fileID: 1827226128182048838, guid: fafd8a2b94542b345ae3f0a90c5df9e2, type: 3}
+  - {fileID: -6345897403542289739, guid: 3d49456916869b24f8dfb435993dfbec, type: 3}
+  - {fileID: 5957932628511814003, guid: b09be4f98e05fa7489d148a376fc0f1c, type: 3}
+  - {fileID: 4303349539650078155, guid: bd386f443b5aff1478cfc4d9f157d560, type: 3}
+  - {fileID: 3094330708855449807, guid: 7760eb562ddb5444b8d0e43f7c2192df, type: 3}

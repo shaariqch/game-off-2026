@@ -92,6 +92,13 @@ JOBS = {
     os.path.join(os.environ.get("APPDATA", ""), r"Unity\Asset Store-5.x\More Mountains\ScriptingEffects\Feel.unitypackage"): [
         r"re:^Assets/Feel/FeelDemos/Barbarians/Sounds/FeelBarbarian(sGrunt\d|Hit)\.wav$",
     ],
+    # every figure's animation (the user's call, 2026-11-28): Kevin Iglesias' Human Mega Animations Pack, humanoid
+    # clips only (both genders), plus the two models their avatars are copied from
+    os.path.join(os.environ.get("APPDATA", ""), r"Unity\Asset Store-5.x\Kevin Iglesias\Animation\Human Mega Animations Pack.unitypackage"): [
+        r"re:^Assets/Kevin Iglesias/Human Animations/Animations/(Male|Female)/(Idles/Human[MF]@(Idle01|MilitaryIdle01)|Movement/(Walk|Run|Sprint)/(RootMotion/)?Human[MF]@(Walk|Run|Sprint)01_Forward( \[RM\])?|Combat/1H/Human[MF]@(Attack1H0\d_R|CombatIdle1H01)|Combat/Polearm/Human[MF]@(AttackPolearm0\d|CombatIdlePolearm01)|Combat/Human[MF]@(Damage0\d|CombatDamage0\d|Stun01|Knockdown01 - \w+|Death0\d|CombatDeath0\d)|Combat/Bow/Human[MF]@[^/]*)\.fbx$",
+        r"re:^Assets/Kevin Iglesias/Human Animations/Animations/Masked Poses/Human[MF]@WeaponHoldPolearm01\.fbx$",
+        r"re:^Assets/Kevin Iglesias/Human Animations/Models/Human[MF]_Model\.fbx$",
+    ],
 }
 # packs already partly imported somewhere else; new files from them go there too
 REMAP = {
@@ -102,6 +109,7 @@ REMAP = {
     "Assets/CelerisLab/": "Assets/_Project/ThirdParty/CelerisLab/",
     "Assets/Fantacode Studios/Melee Combat System/Sfx/": "Assets/_Project/ThirdParty/Audio/FS Melee/",
     "Assets/Feel/FeelDemos/Barbarians/Sounds/": "Assets/_Project/ThirdParty/Audio/Feel Barbarians/",
+    "Assets/Kevin Iglesias/": "Assets/_Project/ThirdParty/Kevin Iglesias/",
 }
 # python Tools/extract_props.py icons: only the jobs whose pack name contains that word, to skip re-reading the rest
 if len(sys.argv) > 1:

@@ -5,17 +5,17 @@ using UnityEngine;
 
 /// <summary>
 /// There's no riding animation among the packs, so the riders' seated pose is built from a standing idle: its first
-/// frame, held, with the legs bent astride and the hands forward on the reins, set through humanoid muscle values.
+/// frame (Kevin Iglesias' female idle since 2026-11-28, Synty's before), held, with the legs bent astride and the hands forward on the reins, set through humanoid muscle values.
 /// Muscle directions on the Synty rig: hip flexion is negative Upper Leg Front-Back, abduction positive In-Out, a
 /// bent knee negative Lower Leg Stretch; an arm comes forward with negative Arm Front-Back and the elbow bends with
 /// negative Forearm Stretch. The clip has no foot IK goals, so riders play it with foot IK off: with it on, both
 /// feet were pulled to the same default goal and the legs folded up under the rider. Build with
 /// Tools > Battle > Build Riding Pose; the clip goes to the git-ignored
-/// ThirdParty folder, since it starts from Synty's clip.
+/// ThirdParty folder, since it starts from a purchased clip.
 /// </summary>
 public static class RidingPose
 {
-    const string Source = "Assets/_Project/ThirdParty/Synty/AnimationBaseLocomotion/Animations/Polygon/Feminine/Idle/A_Idle_Standing_Femn.fbx";
+    const string Source = "Assets/_Project/ThirdParty/Kevin Iglesias/Human Animations/Animations/Female/Idles/HumanF@Idle01.fbx";
     const string Output = "Assets/_Project/ThirdParty/Animations/Riding Pose.anim";
 
     /// <summary>Muscle values for both sides (the side's name is put in front).</summary>
