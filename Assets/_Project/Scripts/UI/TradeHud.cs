@@ -380,12 +380,18 @@ public class TradeHud : MonoBehaviour
         if (builtForBattle != run.Phase || dots.Count != run.Events.Count)
         {
             // a new phase has new events: the old phase's notices go
-            if (builtForBattle != run.Phase)
+            bool newPhase = builtForBattle != run.Phase;
+            if (newPhase)
             {
                 notices.Clear();
                 shown.Clear();
             }
             BuildDots();
+            // a visible event is a known one: its notice is up from the start, as a tipped event's is
+            if (newPhase)
+                foreach (var marketEvent in run.Events)
+                    if ((marketEvent.known || run.WasTipped(marketEvent)) && !run.HasHappened(marketEvent))
+                        ShowNotice(marketEvent, true);
         }
         if (rowsForBattle != run.Phase || rows.Count != run.RowCount)
             BuildRows();
@@ -403,7 +409,8 @@ public class TradeHud : MonoBehaviour
             bool happened = run.HasHappened(marketEvent);
             dot.style.display = run.IsKnown(marketEvent) || happened ? DisplayStyle.Flex : DisplayStyle.None;
             dot.EnableInClassList("dot--past", happened);
-            dot.EnableInClassList("dot--tipped", run.WasTipped(marketEvent));
+            // still to come: a ring, as on its notice; filled once it happens
+            dot.EnableInClassList("dot--pending", !happened);
             // a hidden event only gets its number when a tip reveals it or it happens
             ((Label)dot[0]).text = TradeRun.Roman(run.Number(marketEvent));
         }

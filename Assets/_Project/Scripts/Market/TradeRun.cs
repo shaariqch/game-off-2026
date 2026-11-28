@@ -135,10 +135,13 @@ public class TradeRun : MonoBehaviour
     [SerializeField, Min(0f)] float raidPay = 1.2f;
 
     [Header("Intel")]
-    [Tooltip("Cash for a tip, which reveals one random event still to come in this trading phase.")]
+    [Tooltip("Cash for the day's first tip, which reveals one random event still to come in this trading phase.")]
     [SerializeField, Min(0)] int tipPrice = 20;
-    [Tooltip("Cash to scout one enemy unit type, which shows how many of it the enemy has.")]
+    [Tooltip("Cash for the day's first scouting, which shows how many of one enemy unit type the enemy has.")]
     [SerializeField, Min(0)] int scoutPrice = 15;
+    [Tooltip("Information costs more each time it's bought: each tip multiplies the next tip's price by this, and " +
+             "each scouting the next scouting's. Prices go back down at the start of each trading phase.")]
+    [SerializeField, Min(1f)] float intelPriceRise = 1.5f;
 
     [Header("Battles")]
     [Tooltip("Cash for a win, as a share of what the enemy army was worth at cost. The design: a normal win pays " +
@@ -236,10 +239,28 @@ public class TradeRun : MonoBehaviour
     readonly Dictionary<MarketEvent, int> numbers = new Dictionary<MarketEvent, int>();
     readonly List<Raid> raids = new List<Raid>();
     int nextRaid;
+    int tipsBought, scoutsBought;
 
     public IReadOnlyList<EnemyGroup> Enemy => enemy;
-    public int TipPrice => tipPrice;
-    public int ScoutPrice => scoutPrice;
+    /// <summary>What the next tip costs: it rises with each one bought this phase.</summary>
+    public int TipPrice => IntelPrice(tipPrice, tipsBought);
+    /// <summary>What the next scouting costs: it rises with each one bought this phase.</summary>
+    public int ScoutPrice => IntelPrice(scoutPrice, scoutsBought);
+    int IntelPrice(int first, int bought) => Mathf.RoundToInt(first * Mathf.Pow(intelPriceRise, bought));
+
+    /// <summary>How many tips the cash buys now, each dearer than the last.</summary>
+    int AffordableTips()
+    {
+        int count = 0, spent = 0;
+        while (count < 99)
+        {
+            int price = IntelPrice(tipPrice, tipsBought + count);
+            if (spent + price > Cash) break;
+            spent += price;
+            count++;
+        }
+        return count;
+    }
     /// <summary>Units, then the tip, then the open raid (if any), then the enemy's types.</summary>
     public int RowCount => FirstEnemyRow + enemy.Count;
     int FirstEnemyRow => UnitCount + 1 + (OpenRaid != null ? 1 : 0);
@@ -303,6 +324,7 @@ public class TradeRun : MonoBehaviour
         Reset(sell);
         Raiding = false;
         CurrentRaid = null;
+        tipsBought = scoutsBought = 0;
         revealed.Clear();
         MakeEnemy();
         MakeEvents();
@@ -710,13 +732,13 @@ public class TradeRun : MonoBehaviour
                 return side == Side.Buy ? Market.Affordable(row, Cash) : held[row];
             case RowKind.Tip:
                 if (side == Side.Sell) return 0;
-                return Mathf.Min(tipPrice > 0 ? Cash / tipPrice : 99, Hidden().Count);
+                return Mathf.Min(AffordableTips(), Hidden().Count);
             case RowKind.Raid:
                 // the whole army goes, once
                 return side == Side.Buy && RaidReached != null && ArmySize() > 0 ? 1 : 0;
             default:
                 var group = EnemyAt(row);
-                return side == Side.Buy && !group.scouted && Cash >= scoutPrice ? 1 : 0;
+                return side == Side.Buy && !group.scouted && Cash >= ScoutPrice ? 1 : 0;
         }
     }
 
@@ -736,7 +758,7 @@ public class TradeRun : MonoBehaviour
         if (KindOf(order.row) == RowKind.Tip)
         {
             var left = Hidden();
-            int count = Mathf.Min(order.count, left.Count, tipPrice > 0 ? Cash / tipPrice : 99);
+            int count = Mathf.Min(order.count, left.Count, AffordableTips());
             for (int i = 0; i < count; i++)
             {
                 int pick = UnityEngine.Random.Range(0, left.Count);
@@ -744,8 +766,10 @@ public class TradeRun : MonoBehaviour
                 left.RemoveAt(pick);
                 revealed.Add(marketEvent);
                 GiveNumber(marketEvent);
-                Cash -= tipPrice;
-                Debug.Log($"[Trade] tip: {marketEvent.text} (at {marketEvent.time:0} s)");
+                int price = TipPrice;
+                Cash -= price;
+                tipsBought++;
+                Debug.Log($"[Trade] tip for {price}: {marketEvent.text} (at {marketEvent.time:0} s)");
                 Tipped?.Invoke(marketEvent);
             }
             Traded?.Invoke(Side.Buy, order.row, count);
@@ -763,12 +787,14 @@ public class TradeRun : MonoBehaviour
         else if (KindOf(order.row) == RowKind.Enemy)
         {
             var group = EnemyAt(order.row);
-            bool scout = !group.scouted && Cash >= scoutPrice;
+            int price = ScoutPrice;
+            bool scout = !group.scouted && Cash >= price;
             if (scout)
             {
                 group.scouted = true;
-                Cash -= scoutPrice;
-                Debug.Log($"[Trade] scouted: the enemy has {group.count} {group.type.name}");
+                Cash -= price;
+                scoutsBought++;
+                Debug.Log($"[Trade] scouted for {price}: the enemy has {group.count} {group.type.name}");
             }
             Traded?.Invoke(Side.Buy, order.row, scout ? 1 : 0);
         }
