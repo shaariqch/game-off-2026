@@ -774,6 +774,19 @@ public class TradeRun : MonoBehaviour
         Reset(order);
     }
 
+    /// <summary>For testing (the dev panel): trading is on, so the battle can be started now.</summary>
+    public bool CanForceBattle => !AtBattle && !Raiding;
+
+    /// <summary>For testing (the dev panel): jumps the timeline to the battle. Pending trades go through first, and
+    /// events and raids still to come are skipped.</summary>
+    public void ForceBattle()
+    {
+        if (!CanForceBattle)
+            return;
+        Debug.Log($"[Trade] battle {Battle} forced at {PhaseTime:0}s");
+        PhaseTime = phaseLength;
+    }
+
     void StartRaid(Raid raid)
     {
         RemoveRaidRow();
