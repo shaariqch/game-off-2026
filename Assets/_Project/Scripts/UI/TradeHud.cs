@@ -35,6 +35,8 @@ public class TradeHud : MonoBehaviour
     [SerializeField] Color noticeColour = new Color(0.498f, 0.769f, 0.788f);
     [SerializeField] Color invasionColour = new Color(0.878f, 0.396f, 0.31f);
     [SerializeField] Color raidColour = new Color(0.89f, 0.72f, 0.4f);
+    [Tooltip("Place names in a notice's sentence show in this colour, apart from the event colours.")]
+    [SerializeField] Color placeColour = new Color(0.79f, 0.71f, 0.95f);
 
     [Header("Trade bar")]
     [Tooltip("Seconds the bar stays full after a trade goes through, while its word shows, before it fades.")]
@@ -350,7 +352,7 @@ public class TradeHud : MonoBehaviour
             number.AddToClassList("notice-number");
             notice.panel.Add(number);
         }
-        var text = new Label(Highlight(message, colour));
+        var text = new Label(Highlight(message, colour, placeName, placeColour));
         text.AddToClassList("notice-text");
         notice.panel.Add(text);
         notice.root.Add(notice.panel);
@@ -383,11 +385,17 @@ public class TradeHud : MonoBehaviour
 
     /// <summary>
     /// Words between asterisks in an event's sentence are its clue (which unit it moves); they show in the event's
-    /// colour, so the part that matters stands out.
+    /// colour, so the part that matters stands out. The place's name shows in its own colour.
     /// </summary>
-    static string Highlight(string message, Color colour) =>
-        System.Text.RegularExpressions.Regex.Replace(message ?? "", @"\*([^*]+)\*",
+    static string Highlight(string message, Color colour, string place, Color placeColour)
+    {
+        string text = message ?? "";
+        if (!string.IsNullOrEmpty(place))
+            text = System.Text.RegularExpressions.Regex.Replace(text, $@"\b{System.Text.RegularExpressions.Regex.Escape(place)}\b",
+                $"<color=#{ColorUtility.ToHtmlStringRGB(placeColour)}>{place}</color>");
+        return System.Text.RegularExpressions.Regex.Replace(text, @"\*([^*]+)\*",
             $"<color=#{ColorUtility.ToHtmlStringRGB(colour)}>$1</color>");
+    }
 
     Color Colour(MarketEvent marketEvent) =>
         marketEvent.category == MarketEvent.Category.Invasion ? invasionColour : noticeColour;

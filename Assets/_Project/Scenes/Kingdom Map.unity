@@ -19887,6 +19887,7 @@ MonoBehaviour:
   noticeColour: {r: 0.498, g: 0.769, b: 0.788, a: 1}
   invasionColour: {r: 0.878, g: 0.396, b: 0.31, a: 1}
   raidColour: {r: 0.89, g: 0.72, b: 0.4, a: 1}
+  placeColour: {r: 0.79, g: 0.71, b: 0.95, a: 1}
   tradeHold: 0.9
 --- !u!114 &1909177706
 MonoBehaviour:
@@ -19938,7 +19939,9 @@ MonoBehaviour:
     buyImpact: 0.06
     sellImpact: 0.06
     pull: 0.05
-    drift: 0.012
+    drift: 0.01
+    driftTurn: 0.2
+    priceHysteresis: 0.35
     factorRange: {x: 0.3, y: 3}
     eventRise: 4
     eventFade: 45

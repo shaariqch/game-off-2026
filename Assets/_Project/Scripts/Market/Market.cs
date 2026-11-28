@@ -24,8 +24,14 @@ public sealed class Market
         public float sellImpact;
         [Tooltip("How fast the player's own effect on a price wears off, per second (0.05 closes about 5 % of the gap a second). Events don't go through this.")]
         public float pull;
-        [Tooltip("Random wander of the price factor, per square root of a second.")]
+        [Tooltip("How hard the drift's speed is shaken, per square root of a second. Prices drift at a speed that " +
+                 "itself changes slowly, so they run up or down for a while and turn, instead of jittering.")]
         public float drift;
+        [Tooltip("How fast a drift's speed dies away, per second: lower gives longer runs before a price turns.")]
+        public float driftTurn;
+        [Tooltip("How far past the half-way mark a price's true value has to move before the shown price changes, in " +
+                 "cash. Stops a price that sits on a boundary flicking back and forth; trades always show at once.")]
+        public float priceHysteresis;
         [Tooltip("The price factor never goes outside this range.")]
         public Vector2 factorRange;
         [Tooltip("Seconds an event takes to reach its full push.")]
@@ -40,7 +46,9 @@ public sealed class Market
             buyImpact = 0.06f,
             sellImpact = 0.06f,
             pull = 0.05f,
-            drift = 0.012f,
+            drift = 0.01f,
+            driftTurn = 0.2f,
+            priceHysteresis = 0.35f,
             factorRange = new Vector2(0.3f, 3f),
             eventRise = 4f,
             eventFade = 45f,
@@ -55,6 +63,8 @@ public sealed class Market
         public float factor = 1f;
         /// <summary>What running events add to the price factor right now.</summary>
         public float eventPush;
+        /// <summary>How fast drift is moving the factor now, per second.</summary>
+        internal float driftSpeed;
         internal Vector2 range;
 
         /// <summary>The price factor with events, as the price uses it.</summary>
@@ -62,7 +72,22 @@ public sealed class Market
         /// <summary>Prices at past moments, oldest first, for the trend.</summary>
         internal readonly Queue<(float time, int price)> history = new Queue<(float, int)>();
 
-        public int Price => Mathf.Max(1, Mathf.RoundToInt(type.cost * Total));
+        /// <summary>The price shown and paid: the true price, held still until it moves clear of the last one shown
+        /// (see <see cref="Settings.priceHysteresis"/>).</summary>
+        public int Price => shown > 0 ? shown : Exact;
+        int Exact => Mathf.Max(1, Mathf.RoundToInt(type.cost * Total));
+        int shown;
+
+        /// <summary>Moves the shown price to the true one once it's far enough away.</summary>
+        internal void Settle(float hysteresis)
+        {
+            float raw = type.cost * Total;
+            if (shown <= 0 || Mathf.Abs(raw - shown) >= 0.5f + hysteresis)
+                shown = Exact;
+        }
+
+        /// <summary>Shows the true price now (after a trade, which should always show).</summary>
+        internal void Snap() => shown = Exact;
         /// <summary>1 rising, -1 falling, 0 level, compared with the trend window ago.</summary>
         public int Trend { get; internal set; }
     }
@@ -138,8 +163,12 @@ public sealed class Market
             listing.range = settings.factorRange;
             // the gap closes by a share per second whatever the frame rate
             listing.factor += (1f - listing.factor) * (1f - Mathf.Exp(-settings.pull * dt));
-            listing.factor += settings.drift * Mathf.Sqrt(dt) * Gaussian();
+            // the noise moves the drift's speed, not the price itself: shaken straight onto the price, it rocked
+            // across a rounding line (40, 41, 40, 41) and looked like a glitch rather than a market
+            listing.driftSpeed += -listing.driftSpeed * settings.driftTurn * dt + settings.drift * Mathf.Sqrt(dt) * Gaussian();
+            listing.factor += listing.driftSpeed * dt;
             listing.factor = Mathf.Clamp(listing.factor, settings.factorRange.x, settings.factorRange.y);
+            listing.Settle(settings.priceHysteresis);
 
             int price = listing.Price;
             listing.history.Enqueue((time, price));
@@ -157,9 +186,11 @@ public sealed class Market
         int bought = 0, spent = 0;
         while (bought < count && listing.Price <= cash - spent)
         {
+            // the first unit at the price shown, each after it at the price the buying has pushed it to
             spent += listing.Price;
             bought++;
             listing.factor = Mathf.Min(listing.factor + settings.buyImpact, settings.factorRange.y);
+            listing.Snap();
         }
         return (bought, spent);
     }
@@ -173,6 +204,7 @@ public sealed class Market
         {
             made += listing.Price;
             listing.factor = Mathf.Max(listing.factor - settings.sellImpact, settings.factorRange.x);
+            listing.Snap();
         }
         return made;
     }
@@ -200,7 +232,8 @@ public sealed class Market
         while (count < 999)
         {
             float total = Mathf.Clamp(factor + listing.eventPush, settings.factorRange.x, settings.factorRange.y);
-            int price = Mathf.Max(1, Mathf.RoundToInt(listing.type.cost * total));
+            // the first unit at the price shown, as Buy charges it
+            int price = count == 0 ? listing.Price : Mathf.Max(1, Mathf.RoundToInt(listing.type.cost * total));
             if (spent + price > cash) break;
             spent += price;
             count++;
