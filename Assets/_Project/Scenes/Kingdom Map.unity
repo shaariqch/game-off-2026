@@ -8404,15 +8404,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6948066749842676577, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_LocalScale.x
-      value: 2.5
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 6948066749842676577, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_LocalScale.y
-      value: 2.5
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 6948066749842676577, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_LocalScale.z
-      value: 2.5
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 6948066750211098914, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_LocalRotation.w
@@ -8724,15 +8724,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6948066750454693066, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 128
+      value: 643.27563
       objectReference: {fileID: 0}
     - target: {fileID: 6948066750454693066, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 95
+      value: 704.4707
       objectReference: {fileID: 0}
     - target: {fileID: 6948066750454693066, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 140
+      value: 584.9999
       objectReference: {fileID: 0}
     - target: {fileID: 6948066750454693066, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_LocalRotation.w
@@ -16373,7 +16373,7 @@ Camera:
     height: 1
   near clip plane: 1
   far clip plane: 4000
-  field of view: 34
+  field of view: 40
   orthographic: 0
   orthographic size: 10
   m_Depth: 0
@@ -16399,8 +16399,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1491646142}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.25881907, y: 0, z: 0, w: 0.9659259}
-  m_LocalPosition: {x: 128, y: 95, z: 140}
+  m_LocalRotation: {x: 0.3265056, y: -0.6272114, z: 0.3265056, w: 0.6272114}
+  m_LocalPosition: {x: 643.27563, y: 704.4707, z: 584.9999}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -19947,112 +19947,112 @@ MonoBehaviour:
   - time: 0
     category: 1
     place: Millbrook
-    text: Millbrook recruits a town watch.
+    text: Millbrook recruits a *town watch*.
     affects: {fileID: 11400000, guid: e446b0765ca2bc04182feb297332617e, type: 2}
     strength: 0.6
     known: 1
   - time: 0
     category: 1
     place: Harrowby
-    text: Bread riots break out in Harrowby.
+    text: '*Bread riots* break out in Harrowby.'
     affects: {fileID: 11400000, guid: e446b0765ca2bc04182feb297332617e, type: 2}
     strength: 0.5
     known: 1
   - time: 0
     category: 1
     place: Kingsmere
-    text: The harvest is in at Kingsmere, and farmhands look for work.
+    text: The harvest is in at Kingsmere, and *farmhands look for work*.
     affects: {fileID: 11400000, guid: e446b0765ca2bc04182feb297332617e, type: 2}
     strength: -0.45
     known: 1
   - time: 0
     category: 1
     place: Saltmouth
-    text: Saltmouth's fishing fleet is laid up for the winter.
+    text: Saltmouth's *fishing fleet is laid up* for the winter.
     affects: {fileID: 11400000, guid: e446b0765ca2bc04182feb297332617e, type: 2}
     strength: -0.4
     known: 1
   - time: 0
     category: 0
     place: Millbrook
-    text: Mounted raiders sighted near Millbrook.
+    text: '*Mounted raiders* sighted near Millbrook.'
     affects: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
     strength: 0.6
     known: 1
   - time: 0
     category: 0
     place: Highfield
-    text: Horse lords gather beyond Highfield.
+    text: '*Horse lords* gather beyond Highfield.'
     affects: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
     strength: 0.5
     known: 1
   - time: 0
     category: 1
     place: Kingsford
-    text: Kingsford's smiths finish a great order of pikes.
+    text: Kingsford's smiths finish a great order of *pikes*.
     affects: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
     strength: -0.45
     known: 1
   - time: 0
     category: 1
     place: Harrowby
-    text: The Harrowby garrison is paid off and sent home.
+    text: The Harrowby *garrison is paid off* and sent home.
     affects: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
     strength: -0.4
     known: 1
   - time: 0
     category: 0
     place: Stonewatch
-    text: Stonewatch Castle mans its walls.
+    text: Stonewatch Castle *mans its walls*.
     affects: {fileID: 11400000, guid: 5dfe9b2bdcccc4a4aa5be328096a2f35, type: 2}
     strength: 0.6
     known: 1
   - time: 0
     category: 0
     place: Yewdale
-    text: Wolves prowl the woods around Yewdale.
+    text: '*Wolves prowl the woods* around Yewdale.'
     affects: {fileID: 11400000, guid: 5dfe9b2bdcccc4a4aa5be328096a2f35, type: 2}
     strength: 0.5
     known: 1
   - time: 0
     category: 1
     place: Yewdale
-    text: Yewdale's bowyers bring a cartload of bows to market.
+    text: Yewdale's bowyers bring a *cartload of bows* to market.
     affects: {fileID: 11400000, guid: 5dfe9b2bdcccc4a4aa5be328096a2f35, type: 2}
     strength: -0.45
     known: 1
   - time: 0
     category: 1
     place: Reedmere
-    text: The Reedmere archery fair comes to an end.
+    text: The Reedmere *archery fair comes to an end*.
     affects: {fileID: 11400000, guid: 5dfe9b2bdcccc4a4aa5be328096a2f35, type: 2}
     strength: -0.4
     known: 1
   - time: 0
     category: 1
     place: Highfield
-    text: A royal hunt rides out from Highfield.
+    text: A *royal hunt* rides out from Highfield.
     affects: {fileID: 11400000, guid: fed6eb1591a08494baa5f0623125db68, type: 2}
     strength: 0.5
     known: 1
   - time: 0
     category: 0
     place: Stonewatch
-    text: Enemy bowmen are seen on the hills by Stonewatch.
+    text: '*Enemy bowmen* are seen on the hills by Stonewatch.'
     affects: {fileID: 11400000, guid: fed6eb1591a08494baa5f0623125db68, type: 2}
     strength: 0.55
     known: 1
   - time: 0
     category: 1
     place: Kingsford
-    text: A horse fair opens in Kingsford.
+    text: A *horse fair* opens in Kingsford.
     affects: {fileID: 11400000, guid: fed6eb1591a08494baa5f0623125db68, type: 2}
     strength: -0.45
     known: 1
   - time: 0
     category: 1
     place: Saltmouth
-    text: A ship of horses unloads at Saltmouth.
+    text: A *ship of horses* unloads at Saltmouth.
     affects: {fileID: 11400000, guid: fed6eb1591a08494baa5f0623125db68, type: 2}
     strength: -0.4
     known: 1
@@ -20067,7 +20067,7 @@ MonoBehaviour:
   - Harrowby
   - Highfield
   - Stonewatch
-  raidText: Bandits are raiding the farms near {0}.
+  raidText: '*Bandits* are raiding the farms near {0}.'
   banditTypes:
   - {fileID: 11400000, guid: e446b0765ca2bc04182feb297332617e, type: 2}
   banditWorth: {x: 60, y: 30}
@@ -20083,6 +20083,7 @@ MonoBehaviour:
   countRate: {x: 4, y: 20}
   rampTime: 2.5
   mapCamera: {fileID: 1826910709}
+  mapScrolling: 0
   audioSource: {fileID: 1909177708}
   selectClip: {fileID: 8300000, guid: c418113376cc97945afd63457189a456, type: 3}
   focusClip: {fileID: 8300000, guid: 56fccd51d85d5e848b5f009c77b5a5bd, type: 3}

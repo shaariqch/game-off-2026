@@ -128,25 +128,8 @@
 
 /* still to come (known from the start or from a tip): a ring in the category's colour, filled once it happens */
 .dot--pending {
+    /* dark inside, so the track line doesn't show through; the dashed ring is a HudShape child */
     background-color: rgb(27, 23, 36);
-    border-left-width: 3px;
-    border-right-width: 3px;
-    border-top-width: 3px;
-    border-bottom-width: 3px;
-}
-
-.dot--pending.dot--notice {
-    border-left-color: rgb(127, 196, 201);
-    border-right-color: rgb(127, 196, 201);
-    border-top-color: rgb(127, 196, 201);
-    border-bottom-color: rgb(127, 196, 201);
-}
-
-.dot--pending.dot--invasion {
-    border-left-color: rgb(224, 101, 79);
-    border-right-color: rgb(224, 101, 79);
-    border-top-color: rgb(224, 101, 79);
-    border-bottom-color: rgb(224, 101, 79);
 }
 
 /* an event's numeral, over its dot; the same numeral is on its notice */
@@ -168,11 +151,6 @@
     margin-bottom: 0;
 }
 
-/* inside a ring's border */
-.dot--pending .dot-number {
-    left: -13px;
-    bottom: 12px;
-}
 
 #battle-label {
     font-size: 16px;
@@ -380,10 +358,7 @@
 
 /* an event still to come (known from the start or from a tip): a ring, as on the timeline */
 .notice-dot--pending {
-    border-left-width: 2px;
-    border-right-width: 2px;
-    border-top-width: 2px;
-    border-bottom-width: 2px;
+    /* the dashed ring is a HudShape child */
 }
 
 .notice-number {
@@ -461,14 +436,7 @@
 
 /* the state dots are drawn in the text colour, so they say "coming up" and "happening" without a kind */
 .legend-dot--ring {
-    border-left-width: 2px;
-    border-right-width: 2px;
-    border-top-width: 2px;
-    border-bottom-width: 2px;
-    border-left-color: rgb(241, 230, 208);
-    border-right-color: rgb(241, 230, 208);
-    border-top-color: rgb(241, 230, 208);
-    border-bottom-color: rgb(241, 230, 208);
+    /* the dashed ring is a HudShape child, added by TradeHud */
 }
 
 .legend-dot--filled {

@@ -107,6 +107,12 @@ public class TradeHud : MonoBehaviour
         battleLabel = hud.Q<Label>("battle-label");
         hud.Q("cash-icon").style.backgroundImage = cashIcon;
         hud.Q("battle-icon").style.backgroundImage = battleIcon;
+        // the legend's "coming up" dot is the same dashed ring as the timeline's and the notices'
+        foreach (var ringDot in hud.Query(className: "legend-dot--ring").ToList())
+        {
+            ringDot.Clear();
+            ringDot.Add(HudShape.Ring(new Color(0.945f, 0.902f, 0.816f), 2f));
+        }
         trade = hud.Q("trade");
         tradeFillBuy = hud.Q("trade-fill-buy");
         tradeFillSell = hud.Q("trade-fill-sell");
@@ -284,6 +290,8 @@ public class TradeHud : MonoBehaviour
             number.AddToClassList("dot-number");
             number.pickingMode = PickingMode.Ignore;
             dot.Add(number);
+            // still to come: a dashed ring in the event's colour (shown by the dot--pending state)
+            dot.Add(HudShape.Ring(Colour(marketEvent), 2.5f));
             eventDots.Add(dot);
             dots.Add((marketEvent, dot));
         }
@@ -332,8 +340,8 @@ public class TradeHud : MonoBehaviour
         notice.panel.AddToClassList("notice-panel");
         notice.dot = new VisualElement();
         notice.dot.AddToClassList("notice-dot");
-        notice.dot.style.borderLeftColor = notice.dot.style.borderRightColor =
-            notice.dot.style.borderTopColor = notice.dot.style.borderBottomColor = colour;
+        // still to come: a dashed ring (shown while pending); happening: filled
+        notice.dot.Add(HudShape.Ring(colour, 2f));
         notice.panel.Add(notice.dot);
         if (marketEvent != null)
         {
@@ -342,7 +350,7 @@ public class TradeHud : MonoBehaviour
             number.AddToClassList("notice-number");
             notice.panel.Add(number);
         }
-        var text = new Label(message);
+        var text = new Label(Highlight(message, colour));
         text.AddToClassList("notice-text");
         notice.panel.Add(text);
         notice.root.Add(notice.panel);
@@ -368,9 +376,18 @@ public class TradeHud : MonoBehaviour
     {
         notice.pending = pending;
         notice.dot.EnableInClassList("notice-dot--pending", pending);
+        notice.dot[0].style.display = pending ? DisplayStyle.Flex : DisplayStyle.None;
         notice.dot.style.backgroundColor = pending ? Color.clear
             : notice.marketEvent != null ? Colour(notice.marketEvent) : raidColour;
     }
+
+    /// <summary>
+    /// Words between asterisks in an event's sentence are its clue (which unit it moves); they show in the event's
+    /// colour, so the part that matters stands out.
+    /// </summary>
+    static string Highlight(string message, Color colour) =>
+        System.Text.RegularExpressions.Regex.Replace(message ?? "", @"\*([^*]+)\*",
+            $"<color=#{ColorUtility.ToHtmlStringRGB(colour)}>$1</color>");
 
     Color Colour(MarketEvent marketEvent) =>
         marketEvent.category == MarketEvent.Category.Invasion ? invasionColour : noticeColour;
@@ -411,8 +428,9 @@ public class TradeHud : MonoBehaviour
             bool happened = run.HasHappened(marketEvent);
             dot.style.display = run.IsKnown(marketEvent) || happened ? DisplayStyle.Flex : DisplayStyle.None;
             dot.EnableInClassList("dot--past", happened);
-            // still to come: a ring, as on its notice; filled once it happens
+            // still to come: a dashed ring, as on its notice; filled once it happens
             dot.EnableInClassList("dot--pending", !happened);
+            dot[1].style.display = happened ? DisplayStyle.None : DisplayStyle.Flex;
             // a hidden event only gets its number when a tip reveals it or it happens
             ((Label)dot[0]).text = TradeRun.Roman(run.Number(marketEvent));
         }

@@ -126,7 +126,7 @@ public class TradeRun : MonoBehaviour
     [Tooltip("Places raids happen at (MapPlace names). Each is fought at the raid site of that name under the battle rig, or at the battle site.")]
     [SerializeField] List<string> raidPlaces = new List<string>();
     [Tooltip("The notice on the map; {0} is the place.")]
-    [SerializeField] string raidText = "Bandits are raiding the farms near {0}.";
+    [SerializeField] string raidText = "*Bandits* are raiding the farms near {0}.";
     [Tooltip("What bandits can be; each raid is one of them.")]
     [SerializeField] List<UnitType> banditTypes = new List<UnitType>();
     [Tooltip("What a raid's bandits are worth at cost before the first battle, and what each later battle adds. Each raid is a third more or less at random.")]
