@@ -35,6 +35,9 @@ public class TradeHud : MonoBehaviour
     [SerializeField] Color noticeColour = new Color(0.498f, 0.769f, 0.788f);
     [SerializeField] Color invasionColour = new Color(0.878f, 0.396f, 0.31f);
     [SerializeField] Color raidColour = new Color(0.89f, 0.72f, 0.4f);
+    [Tooltip("A notice fades out as its event's effect wears off: fully shown above the second share of the effect " +
+             "left, gone at the first.")]
+    [SerializeField] Vector2 noticeFade = new Vector2(0.5f, 0.75f);
     [Tooltip("Place names in a notice's sentence show in this colour, apart from the event colours.")]
     [SerializeField] Color placeColour = new Color(0.79f, 0.71f, 0.95f);
 
@@ -585,11 +588,15 @@ public class TradeHud : MonoBehaviour
         for (int i = shown.Count - 1; i >= 0; i--)
         {
             var notice = shown[i];
-            // a notice stays up while its event is still to come (known from a tip) or still moves the market, and a
-            // raid's while it's in the list
+            // a notice stays up while its event is still to come, fades out as the event's effect wears off and goes
+            // once less than noticeFade.x of it is left (old ones piled up while they barely moved prices); a raid's
+            // stays while the raid is in the list
+            float effectLeft = notice.marketEvent != null && run.HasHappened(notice.marketEvent)
+                ? run.Market.Remaining(notice.marketEvent) : 1f;
             bool over = notice.marketEvent != null
-                ? run.HasHappened(notice.marketEvent) && run.Market.Strength(notice.marketEvent) <= 0f
+                ? effectLeft <= noticeFade.x
                 : notice.raid != run.OpenRaid;
+            notice.root.style.opacity = Mathf.InverseLerp(noticeFade.x, noticeFade.y, effectLeft);
             if (over || notice.place == null)
             {
                 notice.root.RemoveFromHierarchy();

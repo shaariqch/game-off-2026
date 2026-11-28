@@ -139,6 +139,18 @@ public sealed class Market
         return 0f;
     }
 
+    /// <summary>How much of a running event is left: 1 until it peaks, then falling to 0 as it fades (0 once gone).</summary>
+    public float Remaining(MarketEvent marketEvent)
+    {
+        foreach (var r in running)
+            if (r.definition == marketEvent)
+            {
+                float age = time - r.started;
+                return age < settings.eventRise ? 1f : EventShape(age);
+            }
+        return 0f;
+    }
+
     public void Tick(float dt)
     {
         time += dt;
