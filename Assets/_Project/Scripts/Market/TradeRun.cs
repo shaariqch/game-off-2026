@@ -233,6 +233,7 @@ public class TradeRun : MonoBehaviour
     readonly HashSet<MarketEvent> revealed = new HashSet<MarketEvent>();
     readonly List<MarketEvent> hidden = new List<MarketEvent>();
     readonly List<MarketEvent> phaseEvents = new List<MarketEvent>();
+    readonly Dictionary<MarketEvent, int> numbers = new Dictionary<MarketEvent, int>();
     readonly List<Raid> raids = new List<Raid>();
     int nextRaid;
 
@@ -248,8 +249,19 @@ public class TradeRun : MonoBehaviour
         : row < FirstEnemyRow ? RowKind.Raid
         : RowKind.Enemy;
     public EnemyGroup EnemyAt(int row) => enemy[row - FirstEnemyRow];
-    /// <summary>An event's number in this phase, from 1 in time order, as the timeline and its notice show it.</summary>
-    public int Number(MarketEvent marketEvent) => phaseEvents.IndexOf(marketEvent) + 1;
+    /// <summary>
+    /// An event's number in this phase, as the timeline and its notice show it, or 0 while the player doesn't know of
+    /// it. Numbers are given as the player learns of events: those known from the start in time order, then each
+    /// hidden one when a tip reveals it or it happens. (Numbering every event by time gave hidden ones away: a gap
+    /// between I and III showed something hidden sat there.)
+    /// </summary>
+    public int Number(MarketEvent marketEvent) => numbers.TryGetValue(marketEvent, out int number) ? number : 0;
+
+    void GiveNumber(MarketEvent marketEvent)
+    {
+        if (!numbers.ContainsKey(marketEvent))
+            numbers[marketEvent] = numbers.Count + 1;
+    }
     /// <summary>Shown on the timeline before it happens: known from the start, or revealed by a tip.</summary>
     public bool IsKnown(MarketEvent marketEvent) => marketEvent.known || revealed.Contains(marketEvent);
     public bool WasTipped(MarketEvent marketEvent) => revealed.Contains(marketEvent);
@@ -325,9 +337,13 @@ public class TradeRun : MonoBehaviour
             });
         }
         phaseEvents.Sort((a, b) => a.time.CompareTo(b.time));
+        numbers.Clear();
+        foreach (var marketEvent in phaseEvents)
+            if (marketEvent.known)
+                GiveNumber(marketEvent);
         var parts = new List<string>();
         foreach (var marketEvent in phaseEvents)
-            parts.Add($"{Roman(Number(marketEvent))} {marketEvent.time:0}s {marketEvent.affects.name} " +
+            parts.Add($"{(Number(marketEvent) > 0 ? Roman(Number(marketEvent)) : "-")} {marketEvent.time:0}s {marketEvent.affects.name} " +
                       $"{marketEvent.strength:+0.0;-0.0}{(marketEvent.known ? "" : " hidden")}");
         Debug.Log($"[Trade] battle {Battle} events: {string.Join(", ", parts)}");
     }
@@ -515,6 +531,7 @@ public class TradeRun : MonoBehaviour
             {
                 Market.Start(marketEvent);
                 Play(marketEvent.category == MarketEvent.Category.Invasion ? invasionClip : noticeClip);
+                GiveNumber(marketEvent);
                 EventStarted?.Invoke(marketEvent);
                 Debug.Log($"[Trade] event at {marketEvent.place}: {marketEvent.text}");
             }
@@ -726,6 +743,7 @@ public class TradeRun : MonoBehaviour
                 var marketEvent = left[pick];
                 left.RemoveAt(pick);
                 revealed.Add(marketEvent);
+                GiveNumber(marketEvent);
                 Cash -= tipPrice;
                 Debug.Log($"[Trade] tip: {marketEvent.text} (at {marketEvent.time:0} s)");
                 Tipped?.Invoke(marketEvent);

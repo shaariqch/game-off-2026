@@ -276,8 +276,8 @@ public class TradeHud : MonoBehaviour
             dot.AddToClassList("dot");
             dot.AddToClassList(marketEvent.category == MarketEvent.Category.Invasion ? "dot--invasion" : "dot--notice");
             dot.style.left = Length.Percent(100f * Mathf.Clamp01(marketEvent.time / run.PhaseLength));
-            // the same numeral as its notice, so the two can be matched
-            var number = new Label(TradeRun.Roman(run.Number(marketEvent)));
+            // the same numeral as its notice, so the two can be matched; filled in once the event has a number
+            var number = new Label();
             number.AddToClassList("serif");
             number.AddToClassList("dot-number");
             number.pickingMode = PickingMode.Ignore;
@@ -404,6 +404,8 @@ public class TradeHud : MonoBehaviour
             dot.style.display = run.IsKnown(marketEvent) || happened ? DisplayStyle.Flex : DisplayStyle.None;
             dot.EnableInClassList("dot--past", happened);
             dot.EnableInClassList("dot--tipped", run.WasTipped(marketEvent));
+            // a hidden event only gets its number when a tip reveals it or it happens
+            ((Label)dot[0]).text = TradeRun.Roman(run.Number(marketEvent));
         }
         battleLabel.text = $"Battle {run.Battle} of {run.BattlesPerRun}";
         timeline.EnableInClassList("timeline--battle", run.AtBattle);
