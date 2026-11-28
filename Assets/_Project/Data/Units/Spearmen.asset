@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Spearmen
   m_EditorClassIdentifier: Assembly-CSharp::UnitType
   cost: 20
+  squadSize: 5
   description: A well rounded unit, but stronger against mounted units.
   icon: {fileID: 2800000, guid: 94517ea80f6d10c468448605dd9e7635, type: 3}
   role: 0
@@ -21,7 +22,7 @@ MonoBehaviour:
   health: 80
   speed: 4.2
   radius: 0.42
-  meleeDamage: 3.88
+  meleeDamage: 4.2
   meleeInterval: 1
   meleeReach: 0.6
   chargeMultiplier: 1

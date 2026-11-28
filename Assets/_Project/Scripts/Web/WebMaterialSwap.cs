@@ -26,8 +26,14 @@ public static class WebMaterialSwap
     {
         copies.Clear();
         swapped.Clear();
-        if (Application.platform == RuntimePlatform.WebGLPlayer) Apply(true);
+        if (Application.platform != RuntimePlatform.WebGLPlayer) return;
+        Apply(true);
+        // scenes loaded later (the battle scene, beside the map) get the same swap
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
     }
+
+    static void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode) => Apply(true);
 
     // PolygonShader's triplanar tiling times this gives Triplanar_Basic's
     public static float TilingScale = 1f;

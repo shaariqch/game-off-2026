@@ -55,6 +55,12 @@ public class BattleView : MonoBehaviour
     [SerializeField, Min(0f)] float cameraUnitRadius = 1.5f;
     [Tooltip("Seconds over which a dead unit stops counting for the camera, so the view drifts instead of jumping.")]
     [SerializeField, Min(0.01f)] float cameraForgetTime = 2.5f;
+    [Tooltip("How much the camera weighs a unit that isn't fighting, shooting or charging, against 1 for one that is: the view leans to the clash while keeping the armies in it.")]
+    [SerializeField, Range(0f, 1f)] float cameraIdleWeight = 0.5f;
+    [Tooltip("Units further than this many metres from the fighting (riders out on a flank, men running away) drop out of the camera's framing.")]
+    [SerializeField, Min(1f)] float cameraOutlierDistance = 28f;
+    [Tooltip("How fast a unit's weight in the camera's framing follows what it's doing, per second.")]
+    [SerializeField, Min(0.1f)] float cameraWeightRate = 1.5f;
 
     [Header("Figures")]
     [Tooltip("The figures' own material. On each figure it's swapped for its side's outfit material, the same atlas with the clothing recoloured (Tools > Battle > Build Team Colours makes them).")]
@@ -104,6 +110,8 @@ public class BattleView : MonoBehaviour
     [Header("Damage numbers (Damage Numbers Pro)")]
     [Tooltip("A 3D preset popped over a unit for every melee hit and arrow. The view spawns from its own hidden copy, set up with the values below, so the preset itself is never changed.")]
     [SerializeField] DamageNumber hitNumber;
+    [Tooltip("Show a number for every hit and arrow (blows from behind in gold), not only for cavalry charges. Off since battles grew to a hundred a side: the totals covered the clash.")]
+    [SerializeField] bool everyHitNumber;
     [Tooltip("The preset for charges and hits from behind.")]
     [SerializeField] DamageNumber heavyNumber;
     [Tooltip("Metres above a unit's feet a number starts.")]
@@ -211,6 +219,8 @@ public class BattleView : MonoBehaviour
         public Mesh bakedMountDead;
         /// <summary>The mount has fallen and the rider is on the ground beside it.</summary>
         public bool dismounted;
+        /// <summary>The figure's weight in the camera group, easing towards what it's doing.</summary>
+        public float cameraWeight = 1f;
     }
 
     BattleSim sim;
@@ -235,6 +245,18 @@ public class BattleView : MonoBehaviour
 
     /// <summary>The battle being shown, or null before the first one.</summary>
     public BattleSim Sim => sim;
+
+    /// <summary>How many battlefields the terrain root holds (its children), or 0.</summary>
+    public int BattlefieldCount => terrainRoot != null ? terrainRoot.childCount : 0;
+
+    /// <summary>Shows one battlefield (a child of the terrain root) and hides the others; battles are fought on the shown one.</summary>
+    public void UseBattlefield(int index)
+    {
+        if (terrainRoot == null)
+            return;
+        for (int i = 0; i < terrainRoot.childCount; i++)
+            terrainRoot.GetChild(i).gameObject.SetActive(i == index);
+    }
 
     /// <summary>Whether battles started from now on skin their figures on the GPU (see the field's tooltip).</summary>
     public bool BakedFigures
@@ -382,7 +404,8 @@ public class BattleView : MonoBehaviour
     void ShowNumber(BattleSim.Unit unit, float damage, bool heavy)
     {
         var template = heavy ? heavyTemplate : hitTemplate;
-        if (template == null || unit == null || unit.id >= figures.Count || stressNoNumbers)
+        // with armies of a hundred, a number for every blow piled into totals of 400 over the clash
+        if (template == null || unit == null || unit.id >= figures.Count || stressNoNumbers || (!heavy && !everyHitNumber))
             return;
         var figure = figures[unit.id];
         if (figure.root == null)
@@ -865,6 +888,7 @@ public class BattleView : MonoBehaviour
 
     void ShowUnits()
     {
+        var action = ActionCentre();
         for (int i = 0; i < figures.Count; i++)
         {
             var figure = figures[i];
@@ -887,7 +911,7 @@ public class BattleView : MonoBehaviour
                 figure.animation?.Update(Time.deltaTime, 0f);
                 figure.mountAnimation?.Update(Time.deltaTime, 0f);
                 float dead = sim.Time - unit.diedTime;
-                SetCameraWeight(figure.root, 1f - dead / cameraForgetTime);
+                SetCameraWeight(figure.root, figure.cameraWeight * (1f - dead / cameraForgetTime));
                 if (dead > Mathf.Max(fallTime + corpseTime, cameraForgetTime))
                 {
                     figure.animation?.Dispose();
@@ -937,6 +961,7 @@ public class BattleView : MonoBehaviour
                 : position;
             figure.placed = true;
             figure.root.localRotation = Quaternion.Euler(0f, figure.yaw, 0f);
+            FrameFigure(figure, unit, action);
 
             // idle, walk or run by how fast the figure is actually going
             if (figure.animation != null && Time.deltaTime > 0f)
@@ -1028,7 +1053,8 @@ public class BattleView : MonoBehaviour
                     Play(meleeHit);
                     Squash(e.other, e.rear ? 1.6f : 1f);
                     Flinch(e.other, false);
-                    ShowNumber(e.other, e.damage, e.rear);
+                    // a blow from behind is gold only when every hit shows; at this scale only charges do
+                    ShowNumber(e.other, e.damage, e.rear && everyHitNumber);
                     Emit(hits, at, hitColour, e.rear ? 6 : 3);
                     break;
                 case BattleSim.EventKind.ArrowHit:
@@ -1229,6 +1255,47 @@ public class BattleView : MonoBehaviour
             focus.position = focusOther != null ? Vector3.Lerp(FigurePosition(focusUnit), FigurePosition(focusOther), 0.5f) : FigurePosition(focusUnit);
         if (momentCamera != null && momentCamera.enabled != on)
             momentCamera.enabled = on;
+    }
+
+    /// <summary>Where the fighting is: the middle of the units fighting, shooting or charging (or of all of them before any are).</summary>
+    Vector3 ActionCentre()
+    {
+        Vector3 busy = Vector3.zero, all = Vector3.zero;
+        int busyCount = 0, allCount = 0;
+        for (int i = 0; i < figures.Count && i < sim.units.Count; i++)
+        {
+            var unit = sim.units[i];
+            if (!unit.Alive || figures[i].root == null)
+                continue;
+            var at = figures[i].root.position;
+            all += at;
+            allCount++;
+            if (unit.Busy && !unit.fleeing)
+            {
+                busy += at;
+                busyCount++;
+            }
+        }
+        return busyCount > 0 ? busy / busyCount : allCount > 0 ? all / allCount : transform.position;
+    }
+
+    /// <summary>
+    /// Leans the camera's framing towards the clash: a unit fighting, shooting or charging counts fully, an idle
+    /// one less, and one far from the fighting (out on a flank, or running) not at all, so the view stays wide on
+    /// the armies without a lone rider stretching it.
+    /// </summary>
+    void FrameFigure(Figure figure, BattleSim.Unit unit, Vector3 action)
+    {
+        if (cameraGroup == null)
+            return;
+        float wanted = unit.fleeing ? 0f : unit.Busy ? 1f : cameraIdleWeight;
+        var offset = figure.root.position - action;
+        offset.y = 0f;
+        float far = offset.magnitude;
+        if (far > cameraOutlierDistance)
+            wanted *= Mathf.Clamp01(1f - (far - cameraOutlierDistance) / 6f);
+        figure.cameraWeight = Mathf.MoveTowards(figure.cameraWeight, wanted, cameraWeightRate * Time.unscaledDeltaTime);
+        SetCameraWeight(figure.root, figure.cameraWeight, false);
     }
 
     void SetCameraWeight(Transform member, float weight, bool removeAtZero = true)

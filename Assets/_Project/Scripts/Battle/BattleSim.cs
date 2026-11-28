@@ -87,6 +87,15 @@ public sealed class BattleSim
         internal Vector2 waypoint;
         internal float stateSince;
         internal bool inSlot;
+        /// <summary>Its block in the formation (0 the line, 1 the ranged, 2 cavalry) and rank in it (0 the front).</summary>
+        internal int block, rank;
+        /// <summary>Fighting, shooting, riding a charge or running this step: not standing idle.</summary>
+        internal bool busy;
+        /// <summary>Fighting, shooting, riding a charge or running in the last step (the camera frames these).</summary>
+        public bool Busy => busy;
+        internal Vector2 stepStart;
+        /// <summary>Its side has routed: it runs for its own edge of the field and no longer fights.</summary>
+        public bool fleeing;
 
         public bool Alive => diedTime < 0f;
     }
@@ -106,6 +115,8 @@ public sealed class BattleSim
         public float contactTime = -1f;
         /// <summary>The line has been fighting long enough to break up: every unit goes for the nearest enemy.</summary>
         public bool broken;
+        /// <summary>Sim time the side broke and ran, or -1.</summary>
+        public float routTime = -1f;
         internal bool engagedNow;
 
         public Vector2 SlotPosition(Vector2 slot) => anchor + forward * slot.x + lateral * slot.y;
@@ -153,8 +164,13 @@ public sealed class BattleSim
         public float fileSpacing;
         [Tooltip("Metres between one rank and the next.")]
         public float rankSpacing;
-        [Tooltip("Most units side by side in one rank.")]
+        [Tooltip("Most units side by side in one rank (the field's width may allow fewer).")]
         public int maxFrontage;
+        [Tooltip("Units side by side in a block's ranks: this times the square root of its size, so a bigger army " +
+                 "stands wider instead of deeper (a fixed 8 abreast stood 70 soldiers 9 ranks deep, most never reaching the fight).")]
+        public float frontageScale;
+        [Tooltip("Fewest units side by side in a rank, for small blocks.")]
+        public int minFrontage;
         [Tooltip("Metres between the back of the line and the ranged units behind it.")]
         public float rangedGap;
         [Tooltip("Metres between the end of the line and the cavalry on each wing.")]
@@ -167,6 +183,26 @@ public sealed class BattleSim
         public float engageDistance;
         [Tooltip("Seconds after its line first meets the enemy that a formation breaks up and every unit goes for the nearest enemy.")]
         public float generalMeleeAfter;
+
+        [Header("Targets")]
+        [Tooltip("How many melee attackers a soldier on foot has room for; more pick someone else if they can.")]
+        public int attackersPerSoldier;
+        [Tooltip("How many melee attackers a rider has room for.")]
+        public int attackersPerRider;
+        [Tooltip("Metres added to a target's score for each attacker past its room, so spare men spread along the enemy's line.")]
+        public float crowdPenalty;
+        [Tooltip("A unit only changes target for one scoring better than this share of its current one, so it doesn't flip between two.")]
+        public float targetStickiness;
+        [Tooltip("Once the lines have met, a soldier with no one in reach goes for an enemy with room within this many metres instead of waiting in his place.")]
+        public float seekDistance;
+
+        [Header("Rout")]
+        [Tooltip("A side breaks and runs when it's down to this share of the units it started with (0: never).")]
+        public float routShare;
+        [Tooltip("Sides that started with fewer units than this fight to the last.")]
+        public int routMinimum;
+        [Tooltip("Seconds of running before the battle is called.")]
+        public float routEndDelay;
 
         [Header("Cavalry")]
         [Tooltip("Cavalry ride out once the lines meet, an enemy comes this close, or after Cavalry Wait seconds.")]
@@ -208,8 +244,10 @@ public sealed class BattleSim
         public static Settings Default => new Settings
         {
             retargetInterval = 0.5f, maxDuration = 180f, holdEngageDistance = 4f,
-            fileSpacing = 1.6f, rankSpacing = 1.6f, maxFrontage = 8, rangedGap = 2.5f, wingGap = 3f,
-            marchSpeed = 0.9f, maxSlotLag = 1.2f, engageDistance = 3f, generalMeleeAfter = 7f,
+            fileSpacing = 1.6f, rankSpacing = 1.6f, maxFrontage = 26, frontageScale = 2f, minFrontage = 6, rangedGap = 2.5f, wingGap = 3f,
+            marchSpeed = 0.9f, maxSlotLag = 1.2f, engageDistance = 3f, generalMeleeAfter = 3f,
+            attackersPerSoldier = 4, attackersPerRider = 6, crowdPenalty = 6f, targetStickiness = 0.8f, seekDistance = 14f,
+            routShare = 0.2f, routMinimum = 12, routEndDelay = 3f,
             cavalryEngageDistance = 6f, cavalryWait = 9f, flankMargin = 3f, flankDepth = 4f,
             cavalryMeleeTime = 2.5f, wheelDistance = 9f,
             chargeKnockback = 1.6f, chargeStagger = 0.7f, chargeSplashRadius = 1.6f, braceStagger = 0.8f,
@@ -237,8 +275,28 @@ public sealed class BattleSim
     readonly int[] lineAlive = new int[2];
     readonly int[] footAlive = new int[2];
     readonly float[] marchSpeed = new float[2];
+    readonly int[] aliveCount = new int[2];
+    readonly int[] startCount = new int[2];
+    /// <summary>Melee attackers going for each unit (by id), counted every step.</summary>
+    int[] attackers = new int[0];
+    int idleSamples, activeSamples;
+    // A grid of the field in Cell-metre squares, rebuilt every step: each square's first unit (head) and each
+    // unit's next in its square (next), by id. Lookups for nearby units read only the squares round a point,
+    // instead of every unit, which kept armies of 150 a side from costing 3 ms a step.
+    const float Cell = 2f;
+    int gridWidth, gridHeight;
+    int[] gridHead = new int[0];
+    int[] gridNext = new int[0];
+    /// <summary>How far round a unit <see cref="Nearest"/> looks (gap between bodies); further enemies don't count as near.</summary>
+    const float NearLimit = 10f;
     bool contactSeen;
     Vector2 lastDeath;
+
+    /// <summary>
+    /// Since the lines first met: the share of living units, sampled every step, that stood idle, not fighting,
+    /// shooting, riding or running and barely moving. Units waiting in line behind their own front rank count here.
+    /// </summary>
+    public float IdleShare => activeSamples > 0 ? (float)idleSamples / activeSamples : 0f;
 
     /// <summary>True while a side is still standing its ground.</summary>
     public bool IsHolding(int side) => formations[side].holding;
@@ -305,6 +363,7 @@ public sealed class BattleSim
                     });
             }
         Deploy(army_);
+        startCount[side] = army_.Count;
         foreach (var unit in army_)
         {
             var jitter = new Vector2((float)random.NextDouble() - 0.5f, (float)random.NextDouble() - 0.5f) * 0.3f;
@@ -327,10 +386,12 @@ public sealed class BattleSim
         ranged.Sort(byRank);
 
         float depth = 0f;
-        float halfWidth = PlaceBlock(line, ref depth);
+        float halfWidth = PlaceBlock(line, 0, ref depth);
         if (line.Count > 0 && ranged.Count > 0)
             depth -= settings.rangedGap - settings.rankSpacing;
-        halfWidth = Mathf.Max(halfWidth, PlaceBlock(ranged, ref depth));
+        halfWidth = Mathf.Max(halfWidth, PlaceBlock(ranged, 1, ref depth));
+        foreach (var rider in cavalry)
+            rider.block = 2;
         // cavalry in pairs on alternate wings, starting level with the front rank
         float wingStart = (line.Count + ranged.Count > 0 ? halfWidth + settings.wingGap : 0.5f * settings.fileSpacing);
         for (int i = 0; i < cavalry.Count; i++)
@@ -347,17 +408,22 @@ public sealed class BattleSim
     }
 
     /// <summary>Lays units out in ranks from <paramref name="depth"/> backwards and moves it past them. Returns half the block's width.</summary>
-    float PlaceBlock(List<Unit> block, ref float depth)
+    float PlaceBlock(List<Unit> block, int blockIndex, ref float depth)
     {
         if (block.Count == 0)
             return 0f;
-        int frontage = Mathf.Max(1, Mathf.Min(block.Count, settings.maxFrontage));
+        // wider for bigger blocks, so more of them reach the fight; never wider than the field leaves room for
+        int wanted = Mathf.Clamp(Mathf.RoundToInt(Mathf.Sqrt(block.Count) * settings.frontageScale), settings.minFrontage, Mathf.Max(1, settings.maxFrontage));
+        int fits = Mathf.Max(1, Mathf.FloorToInt((bounds.height - 6f) / settings.fileSpacing) + 1);
+        int frontage = Mathf.Max(1, Mathf.Min(block.Count, Mathf.Min(wanted, fits)));
         int ranks = (block.Count + frontage - 1) / frontage;
         for (int i = 0; i < block.Count; i++)
         {
             int rank = i / frontage, file = i % frontage;
             int inRank = Mathf.Min(frontage, block.Count - rank * frontage);
             block[i].slot = new Vector2(depth - rank * settings.rankSpacing, (file - (inRank - 1) * 0.5f) * settings.fileSpacing);
+            block[i].block = blockIndex;
+            block[i].rank = rank;
         }
         depth -= ranks * settings.rankSpacing;
         return (frontage - 1) * 0.5f * settings.fileSpacing;
@@ -383,6 +449,8 @@ public sealed class BattleSim
         Time += Step;
 
         CountForces();
+        CountAttackers();
+        BuildGrid();
         for (int side = 0; side < 2; side++)
             MoveFormation(side);
 
@@ -391,15 +459,22 @@ public sealed class BattleSim
             var unit = units[i];
             if (!unit.Alive)
                 continue;
+            unit.busy = false;
+            unit.stepStart = unit.position;
             unit.cooldown -= Step;
             if (Time < unit.stunnedUntil)
                 continue;
+            if (unit.fleeing)
+            {
+                Flee(unit);
+                continue;
+            }
             unit.retargetIn -= Step;
             if (unit.target == null || !unit.target.Alive || unit.retargetIn <= 0f)
             {
                 // charging cavalry stay on the target they chose
                 if (unit.target == null || !unit.target.Alive || unit.cavalry != CavalryState.Charging && unit.cavalry != CavalryState.Flanking)
-                    unit.target = PickTarget(unit);
+                    SetTarget(unit, PickTarget(unit));
                 unit.retargetIn = settings.retargetInterval;
             }
             if (unit.target == null)
@@ -446,14 +521,149 @@ public sealed class BattleSim
                     unit.diedTime = Time;
                     lastDeath = unit.position;
                     events.Add(new Event { kind = EventKind.Death, position = unit.position, unit = unit });
+                    FillGap(unit);
                 }
             }
             unit.pendingDamage = 0f;
             unit.pendingShot = false;
         }
 
+        BuildGrid();
         Separate();
+        CheckRout();
+        SampleIdle();
         CheckEnd();
+    }
+
+    /// <summary>How many melee attackers are going for each unit, so others can look for an enemy with room.</summary>
+    void CountAttackers()
+    {
+        if (attackers.Length != units.Count)
+            attackers = new int[units.Count];
+        System.Array.Clear(attackers, 0, attackers.Length);
+        foreach (var unit in units)
+            if (Claims(unit, unit.target))
+                attackers[unit.target.id]++;
+    }
+
+    /// <summary>
+    /// Whether a unit counts as one of its target's attackers: a melee unit going for it from near enough to act on
+    /// it (men waiting in their places far behind don't fill up the enemy their front rank needs).
+    /// </summary>
+    bool Claims(Unit unit, Unit target) =>
+        target != null && unit.Alive && !unit.fleeing && target.Alive && !unit.type.IsRanged
+        && Gap(unit, target) <= settings.seekDistance;
+
+    /// <summary>Changes a unit's target, keeping the attacker counts right within the step.</summary>
+    void SetTarget(Unit unit, Unit target)
+    {
+        if (unit.target == target)
+            return;
+        if (attackers.Length == units.Count)
+        {
+            if (Claims(unit, unit.target))
+                attackers[unit.target.id]--;
+            if (Claims(unit, target))
+                attackers[target.id]++;
+        }
+        unit.target = target;
+    }
+
+    int Room(Unit target) => target.type.IsCavalry ? settings.attackersPerRider : settings.attackersPerSoldier;
+
+    /// <summary>Whether a target has room for one more melee attacker (counting this unit if it's already on it).</summary>
+    bool HasRoom(Unit unit, Unit target) => attackers[target.id] - (unit.target == target ? 1 : 0) < Room(target);
+
+    /// <summary>
+    /// When a soldier in formation falls, the man behind him in his file steps into his place, and so on back, so
+    /// the front rank stays full while there are men behind it.
+    /// </summary>
+    void FillGap(Unit fallen)
+    {
+        var formation = formations[fallen.side];
+        if (formation.broken || fallen.block == 2)
+            return;
+        var gap = fallen.slot;
+        int rank = fallen.rank;
+        for (int guard = 0; guard < 64; guard++)
+        {
+            Unit next = null;
+            float best = settings.fileSpacing * 0.75f;
+            foreach (var other in units)
+            {
+                if (other.side != fallen.side || !other.Alive || other.fleeing || other.block != fallen.block || other.rank != rank + 1)
+                    continue;
+                float across = Mathf.Abs(other.slot.y - gap.y);
+                if (across < best)
+                {
+                    best = across;
+                    next = other;
+                }
+            }
+            if (next == null)
+                return;
+            var left = next.slot;
+            next.slot = gap;
+            next.rank = rank;
+            gap = left;
+            rank++;
+        }
+    }
+
+    /// <summary>A side down to <see cref="Settings.routShare"/> of its start breaks and runs; the battle is called soon after.</summary>
+    void CheckRout()
+    {
+        if (settings.routShare <= 0f)
+            return;
+        for (int side = 0; side < 2; side++)
+        {
+            var formation = formations[side];
+            if (formation.routTime >= 0f || startCount[side] < settings.routMinimum)
+                continue;
+            int alive = 0, enemies = 0;
+            foreach (var unit in units)
+                if (unit.Alive && !unit.fleeing)
+                {
+                    if (unit.side == side) alive++;
+                    else enemies++;
+                }
+            // worn down to a fifth of its start and outnumbered: a bigger army doesn't break while it still has more men
+            if (alive == 0 || alive > settings.routShare * startCount[side] || alive >= enemies)
+                continue;
+            formation.routTime = Time;
+            formation.holding = false;
+            foreach (var unit in units)
+                if (unit.side == side && unit.Alive)
+                {
+                    unit.fleeing = true;
+                    // a fleeing rider isn't charging any more (the view would start a charge moment for it)
+                    if (unit.type.IsCavalry)
+                        SetState(unit, CavalryState.Waiting);
+                }
+        }
+    }
+
+    /// <summary>Runs for its own side's edge of the field.</summary>
+    void Flee(Unit unit)
+    {
+        unit.busy = true;
+        var away = -formations[unit.side].forward;
+        MoveTowards(unit, away, float.MaxValue);
+    }
+
+    void SampleIdle()
+    {
+        if (!contactSeen && formations[0].contactTime < 0f && formations[1].contactTime < 0f)
+            return;
+        foreach (var unit in units)
+        {
+            if (!unit.Alive)
+                continue;
+            activeSamples++;
+            float moved = (unit.position - unit.stepStart).magnitude;
+            if (!unit.busy && moved < unit.type.speed * Step * 0.3f)
+                idleSamples++;
+        }
     }
 
     void CountForces()
@@ -499,6 +709,11 @@ public sealed class BattleSim
         formation.anchor += formation.forward * marchSpeed[side] * settings.marchSpeed * Step;
     }
 
+    /// <summary>
+    /// The enemy this unit should go for: near, of a type it's good against, and (for melee) with room for another
+    /// attacker, so spare men spread along the enemy's line instead of piling onto the same few. It keeps its
+    /// current target unless another scores clearly better.
+    /// </summary>
     Unit PickTarget(Unit unit)
     {
         Unit best = null;
@@ -508,32 +723,86 @@ public sealed class BattleSim
             var other = units[i];
             if (other.side == unit.side || !other.Alive)
                 continue;
-            float score = (other.position - unit.position).magnitude * unit.type.TargetWeight(other.type);
+            float score = TargetScore(unit, other);
             if (score < bestScore)
             {
                 bestScore = score;
                 best = other;
             }
         }
+        var current = unit.target;
+        if (current != null && current.Alive && best != current && TargetScore(unit, current) * settings.targetStickiness <= bestScore)
+            return current;
         return best;
     }
 
-    /// <summary>The closest living enemy, and the gap between their bodies.</summary>
+    float TargetScore(Unit unit, Unit other)
+    {
+        float score = (other.position - unit.position).magnitude * unit.type.TargetWeight(other.type);
+        if (!unit.type.IsRanged)
+        {
+            int over = attackers[other.id] - (unit.target == other ? 1 : 0) - Room(other) + 1;
+            if (over > 0)
+                score += settings.crowdPenalty * over;
+        }
+        // a running enemy is less of a worry than one still fighting
+        if (other.fleeing)
+            score += 4f;
+        return score;
+    }
+
+    void BuildGrid()
+    {
+        if (gridHead.Length == 0)
+        {
+            gridWidth = Mathf.Max(1, Mathf.CeilToInt(bounds.width / Cell) + 1);
+            gridHeight = Mathf.Max(1, Mathf.CeilToInt(bounds.height / Cell) + 1);
+            gridHead = new int[gridWidth * gridHeight];
+        }
+        if (gridNext.Length != units.Count)
+            gridNext = new int[units.Count];
+        for (int i = 0; i < gridHead.Length; i++)
+            gridHead[i] = -1;
+        foreach (var unit in units)
+        {
+            if (!unit.Alive)
+                continue;
+            int cell = CellOf(unit.position);
+            gridNext[unit.id] = gridHead[cell];
+            gridHead[cell] = unit.id;
+        }
+    }
+
+    int CellX(float x) => Mathf.Clamp((int)((x - bounds.xMin) / Cell), 0, gridWidth - 1);
+    int CellY(float y) => Mathf.Clamp((int)((y - bounds.yMin) / Cell), 0, gridHeight - 1);
+    int CellOf(Vector2 point) => CellY(point.y) * gridWidth + CellX(point.x);
+
+    /// <summary>The closest living enemy within <see cref="NearLimit"/>, and the gap between their bodies (or null and a huge gap).</summary>
     Unit Nearest(Unit unit, out float gap)
     {
         Unit best = null;
         gap = float.MaxValue;
-        for (int i = 0; i < units.Count; i++)
+        float reach = NearLimit + unit.type.radius + 1f;
+        int x0 = CellX(unit.position.x - reach), x1 = CellX(unit.position.x + reach);
+        int y0 = CellY(unit.position.y - reach), y1 = CellY(unit.position.y + reach);
+        for (int y = y0; y <= y1; y++)
+            for (int x = x0; x <= x1; x++)
+                for (int id = gridHead[y * gridWidth + x]; id >= 0; id = gridNext[id])
+                {
+                    var other = units[id];
+                    if (other.side == unit.side || !other.Alive)
+                        continue;
+                    float g = (other.position - unit.position).magnitude - unit.type.radius - other.type.radius;
+                    if (g < gap)
+                    {
+                        gap = g;
+                        best = other;
+                    }
+                }
+        if (gap > NearLimit)
         {
-            var other = units[i];
-            if (other.side == unit.side || !other.Alive)
-                continue;
-            float g = (other.position - unit.position).magnitude - unit.type.radius - other.type.radius;
-            if (g < gap)
-            {
-                gap = g;
-                best = other;
-            }
+            gap = float.MaxValue;
+            return null;
         }
         return best;
     }
@@ -560,12 +829,13 @@ public sealed class BattleSim
     {
         var formation = formations[unit.side];
         bool line = unit.type.role == UnitType.Role.Line;
-        // in formation, the nearest enemy comes first once it's close
+        // in formation, the nearest enemy comes first once it's close, if it has room for him (or is on him)
         if (!formation.broken)
         {
             var near = Nearest(unit, out float nearGap);
-            if (near != null && near != unit.target && nearGap <= settings.engageDistance)
-                unit.target = near;
+            if (near != null && near != unit.target && nearGap <= settings.engageDistance
+                && (unit.type.IsRanged || HasRoom(unit, near) || near.target == unit))
+                SetTarget(unit, near);
         }
         var target = unit.target;
         float gap = Gap(unit, target);
@@ -575,6 +845,7 @@ public sealed class BattleSim
         {
             if (line || lineAlive[unit.side] == 0)
                 formation.engagedNow = true;
+            unit.busy = true;
             Face(unit, target.position - unit.position);
             Attack(unit, target, shooting);
             return;
@@ -594,6 +865,22 @@ public sealed class BattleSim
                 formation.engagedNow = true;
             MoveTowards(unit, target.position - unit.position, gap - reach + 0.01f);
             return;
+        }
+        bool met = formations[0].contactTime >= 0f || formations[1].contactTime >= 0f;
+        if (met)
+        {
+            // archers behind a deep line move up until their target is in range
+            if (shooting || unit.type.IsRanged)
+            {
+                MoveTowards(unit, target.position - unit.position, gap - reach * 0.9f);
+                return;
+            }
+            // a soldier with no one in reach goes for an enemy with room rather than waiting behind his own rank
+            if (gap <= settings.seekDistance && HasRoom(unit, target))
+            {
+                MoveTowards(unit, target.position - unit.position, gap - reach + 0.01f);
+                return;
+            }
         }
         MoveToSlot(unit);
     }
@@ -629,11 +916,12 @@ public sealed class BattleSim
             }
             case CavalryState.Flanking:
             {
+                unit.busy = true;
                 // anyone in the way gets charged instead
                 var near = Nearest(unit, out float nearGap);
                 if (near != null && nearGap <= settings.engageDistance)
                 {
-                    unit.target = near;
+                    SetTarget(unit, near);
                     SetState(unit, CavalryState.Charging);
                     return;
                 }
@@ -648,6 +936,7 @@ public sealed class BattleSim
             }
             case CavalryState.Charging:
             {
+                unit.busy = true;
                 float reach = unit.type.meleeReach;
                 if (gap <= reach)
                 {
@@ -664,10 +953,12 @@ public sealed class BattleSim
             }
             case CavalryState.Melee:
             {
+                unit.busy = true;
                 var near = Nearest(unit, out float nearGap);
                 if (near != null && nearGap < gap)
                 {
-                    unit.target = target = near;
+                    SetTarget(unit, near);
+                    target = near;
                     gap = nearGap;
                 }
                 // ride clear and come again, unless surrounded
@@ -690,10 +981,11 @@ public sealed class BattleSim
             }
             case CavalryState.Wheeling:
             {
+                unit.busy = true;
                 Vector2 toWaypoint = unit.waypoint - unit.position;
                 if (toWaypoint.magnitude < 1.2f || Time - unit.stateSince > 3f)
                 {
-                    unit.target = PickTarget(unit);
+                    SetTarget(unit, PickTarget(unit));
                     SetState(unit, CavalryState.Charging);
                     return;
                 }
@@ -715,7 +1007,7 @@ public sealed class BattleSim
         var target = PickTarget(unit);
         if (target == null)
             return;
-        unit.target = target;
+        SetTarget(unit, target);
         var formation = formations[unit.side];
         Vector2 outward = formation.lateral * (unit.slot.y >= 0f ? 1f : -1f);
         // how far the enemy's foot soldiers reach out towards this wing, measured from the target
@@ -730,9 +1022,17 @@ public sealed class BattleSim
     int CountEnemiesWithin(Unit unit, float gap)
     {
         int count = 0;
-        foreach (var other in units)
-            if (other.side != unit.side && other.Alive && Gap(unit, other) <= gap)
-                count++;
+        float reach = gap + unit.type.radius + 1f;
+        int x0 = CellX(unit.position.x - reach), x1 = CellX(unit.position.x + reach);
+        int y0 = CellY(unit.position.y - reach), y1 = CellY(unit.position.y + reach);
+        for (int y = y0; y <= y1; y++)
+            for (int x = x0; x <= x1; x++)
+                for (int id = gridHead[y * gridWidth + x]; id >= 0; id = gridNext[id])
+                {
+                    var other = units[id];
+                    if (other.side != unit.side && other.Alive && Gap(unit, other) <= gap)
+                        count++;
+                }
         return count;
     }
 
@@ -877,8 +1177,14 @@ public sealed class BattleSim
             var a = units[i];
             if (!a.Alive)
                 continue;
-            for (int j = i + 1; j < units.Count; j++)
+            // only units in the squares round it can touch it (bodies are well under a square across)
+            int cx = CellX(a.position.x), cy = CellY(a.position.y);
+            for (int y = Mathf.Max(0, cy - 1); y <= Mathf.Min(gridHeight - 1, cy + 1); y++)
+            for (int x = Mathf.Max(0, cx - 1); x <= Mathf.Min(gridWidth - 1, cx + 1); x++)
+            for (int j = gridHead[y * gridWidth + x]; j >= 0; j = gridNext[j])
             {
+                if (j <= i)
+                    continue;
                 var b = units[j];
                 if (!b.Alive)
                     continue;
@@ -912,6 +1218,11 @@ public sealed class BattleSim
         if (aliveA == 0 && aliveB == 0) winner = Draw;
         else if (aliveB == 0) winner = 0;
         else if (aliveA == 0) winner = 1;
+        else if (Routed(0) || Routed(1))
+            // a side that broke has run long enough: the battle goes to the side still standing
+            winner = Routed(0) && Routed(1)
+                ? (ValueLeft(0) == ValueLeft(1) ? Draw : ValueLeft(0) > ValueLeft(1) ? 0 : 1)
+                : Routed(0) ? 1 : 0;
         else if (Time >= settings.maxDuration)
         {
             TimedOut = true;
@@ -924,24 +1235,26 @@ public sealed class BattleSim
         events.Add(new Event { kind = EventKind.End, position = lastDeath });
     }
 
-    /// <summary>The cost of every unit a side started with.</summary>
+    bool Routed(int side) => formations[side].routTime >= 0f && Time - formations[side].routTime >= settings.routEndDelay;
+
+    /// <summary>What every unit a side started with was worth (a soldier is a share of his squad's cost).</summary>
     public int ValueStarted(int side)
     {
-        int value = 0;
+        float value = 0f;
         for (int i = 0; i < units.Count; i++)
             if (units[i].side == side)
-                value += units[i].type.cost;
-        return value;
+                value += units[i].type.SoldierValue;
+        return Mathf.RoundToInt(value);
     }
 
-    /// <summary>The cost of the units a side still has alive.</summary>
+    /// <summary>What a side's living units are worth.</summary>
     public int ValueLeft(int side)
     {
-        int value = 0;
+        float value = 0f;
         for (int i = 0; i < units.Count; i++)
             if (units[i].side == side && units[i].Alive)
-                value += units[i].type.cost;
-        return value;
+                value += units[i].type.SoldierValue;
+        return Mathf.RoundToInt(value);
     }
 
     /// <summary>One line: who won, and how many of each type each side has left out of how many.</summary>

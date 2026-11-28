@@ -211,34 +211,72 @@ public sealed class Market
     /// What trading <paramref name="count"/> units would cost (buying) or make (selling) now, each at the price the
     /// ones before it pushed it to, as <see cref="Buy"/> and <see cref="Sell"/> work it out. Changes nothing.
     /// </summary>
-    public int Total(int index, int count, bool buying)
+    public int Total(int index, int count, bool buying) => Total(index, (float)count, buying);
+
+    /// <summary>As <see cref="Total(int, int, bool)"/>, for a number of units that may end in a part of one (selling a part-squad).</summary>
+    public int Total(int index, float units, bool buying)
     {
         var listing = listings[index];
         float factor = listing.factor;
-        int total = 0;
-        for (int i = 0; i < count; i++)
+        float total = 0f;
+        bool first = true;
+        while (units > 1e-4f)
         {
+            float share = Mathf.Min(1f, units);
             float push = Mathf.Clamp(factor + listing.eventPush, settings.factorRange.x, settings.factorRange.y);
-            total += i == 0 ? listing.Price : Mathf.Max(1, Mathf.RoundToInt(listing.type.cost * push));
+            int price = first ? listing.Price : Mathf.Max(1, Mathf.RoundToInt(listing.type.cost * push));
+            total += price * share;
             factor = buying
-                ? Mathf.Min(factor + settings.buyImpact, settings.factorRange.y)
-                : Mathf.Max(factor - settings.sellImpact, settings.factorRange.x);
+                ? Mathf.Min(factor + settings.buyImpact * share, settings.factorRange.y)
+                : Mathf.Max(factor - settings.sellImpact * share, settings.factorRange.x);
+            units -= share;
+            first = false;
         }
-        return total;
+        return Mathf.RoundToInt(total);
+    }
+
+    /// <summary>
+    /// How many units a budget buys from a fresh market (factor 1, no events), counting the price rising with each
+    /// one as it would for the player: how an enemy or bandit army worth that much is sized.
+    /// </summary>
+    public float UnitsFor(UnitType type, float budget)
+    {
+        float factor = 1f, units = 0f;
+        while (budget > 0f && units < 999f)
+        {
+            float price = Mathf.Max(1f, type.cost * Mathf.Clamp(factor, settings.factorRange.x, settings.factorRange.y));
+            if (budget < price)
+            {
+                units += budget / price;
+                break;
+            }
+            budget -= price;
+            units++;
+            factor += settings.buyImpact;
+        }
+        return units;
     }
 
     /// <summary>Sells <paramref name="count"/> units one at a time, each at the price it has fallen to; returns the money made.</summary>
-    public int Sell(int index, int count)
+    public int Sell(int index, int count) => Sell(index, (float)count);
+
+    /// <summary>
+    /// Sells a number of units that may end in a part of one (a squad that lost men in battle): each whole unit at
+    /// the price it has fallen to, the part at that share of the price, moving the price by that share.
+    /// </summary>
+    public int Sell(int index, float units)
     {
         var listing = listings[index];
-        int made = 0;
-        for (int i = 0; i < count; i++)
+        float made = 0f;
+        while (units > 1e-4f)
         {
-            made += listing.Price;
-            listing.factor = Mathf.Max(listing.factor - settings.sellImpact, settings.factorRange.x);
+            float share = Mathf.Min(1f, units);
+            made += listing.Price * share;
+            listing.factor = Mathf.Max(listing.factor - settings.sellImpact * share, settings.factorRange.x);
             listing.Snap();
+            units -= share;
         }
-        return made;
+        return Mathf.RoundToInt(made);
     }
 
     /// <summary>

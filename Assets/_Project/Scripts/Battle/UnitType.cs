@@ -40,7 +40,10 @@ public class UnitType : ScriptableObject
     }
 
     [Header("Market")]
+    [Tooltip("The price of a squad (squadSize soldiers) at the market's base, and what one is worth.")]
     [Min(1)] public int cost = 10;
+    [Tooltip("Soldiers in a squad: one buy brings this many. Keep it the same for every type, or the match-ups shift (a type with bigger squads gets more men for its money).")]
+    [Min(1)] public int squadSize = 5;
     [Tooltip("Shown under the market list when this type is selected.")]
     [TextArea] public string description;
     [Tooltip("The type's icon in the market list.")]
@@ -113,6 +116,9 @@ public class UnitType : ScriptableObject
     public BakedFigure baked;
 
     public bool Animated => idleClip != null;
+
+    /// <summary>What one soldier of this type is worth: a squad's cost shared among its soldiers.</summary>
+    public float SoldierValue => (float)cost / Mathf.Max(1, squadSize);
 
     public bool IsRanged => rangedDamage > 0f;
     public bool IsCavalry => role == Role.Cavalry;

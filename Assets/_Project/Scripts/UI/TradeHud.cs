@@ -535,7 +535,9 @@ public class TradeHud : MonoBehaviour
         key.root.EnableInClassList("key--closed", run.AtBattle || noSelling);
         // the count, and what it comes to: the price only moves once the trade goes through, so the climbing total
         // is where a long hold shows it's getting dearer
-        string count = order.side == TradeRun.Side.Buy ? "+" + order.count : "−" + order.count;
+        // in soldiers: a buy brings a squad of them
+        int soldiers = run.OrderSoldiers(order);
+        string count = order.side == TradeRun.Side.Buy ? "+" + soldiers : "−" + soldiers;
         int total = idle ? 0 : run.OrderTotal(order);
         key.count.text = total > 0 ? count + " · " + total : count;
         key.arrow.MarkDirtyRepaint();

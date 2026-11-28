@@ -2,14 +2,13 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
-using Unity.Cinemachine;
 using Unity.Scripting.LifecycleManagement; // lifecycle-attr
 using UnityEngine;
 
 /// <summary>
 /// A performance check for army sizes, in development builds only: opened with <c>?stress</c> in a WebGL build's
 /// address (or launched with <c>-stress</c> on Windows), it stops the trading run, mutes the game and fights battles
-/// on the map's battlefield: at each of <see cref="skinnedSizes"/> with SkinnedMeshRenderers, then at each of
+/// in the battle scene (opened through BattleLink, as the game does): at each of <see cref="skinnedSizes"/> with SkinnedMeshRenderers, then at each of
 /// <see cref="sizes"/> with figures skinned on the GPU from their bakes. Each logs the frame rate at the height of the
 /// battle and the view's own per-frame costs as "[Stress]" lines (the local test log on WebGL, Player.log on Windows).
 /// Both sides get the same mix of every unit type, and neither holds, so the lines meet quickly. It switches to the PC
@@ -42,7 +41,10 @@ public class BattleStress : MonoBehaviour
     static void Create()
     {
         if (!Requested()) return;
-        new GameObject("Battle Stress").AddComponent<BattleStress>();
+        // kept apart from the map, which BattleLink hides during a battle (that stopped this coroutine dead)
+        var go = new GameObject("Battle Stress");
+        DontDestroyOnLoad(go);
+        go.AddComponent<BattleStress>();
     }
 
     static void Log(string message) => Debug.Log("[Stress] " + message);
@@ -61,16 +63,14 @@ public class BattleStress : MonoBehaviour
             $"{SystemInfo.graphicsDeviceName} / {SystemInfo.graphicsDeviceVersion}");
 
         var run = FindAnyObjectByType<TradeRun>();
-        var view = FindAnyObjectByType<BattleView>();
-        if (run == null || view == null)
+        var link = FindAnyObjectByType<BattleLink>();
+        if (run == null || link == null)
         {
-            Log("no TradeRun or BattleView in the scene");
+            Log("no TradeRun or BattleLink in the scene");
             yield break;
         }
         yield return new WaitForSeconds(startDelay);
         run.enabled = false;
-        foreach (var link in FindObjectsByType<BattleLink>(FindObjectsSortMode.None))
-            link.enabled = false;
 
         var types = new List<UnitType>();
         foreach (var name in typeNames)
@@ -80,12 +80,17 @@ public class BattleStress : MonoBehaviour
             types.Add(type);
         }
 
-        CinemachineCamera battleCamera = null;
-        foreach (var cam in FindObjectsByType<CinemachineCamera>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-            if (cam.name == "Battle Camera") battleCamera = cam;
-        if (battleCamera != null) battleCamera.enabled = true;
+        // battles are fought in their own scene, as in the game
+        yield return link.Enter(0);
+        var view = link.View;
+        if (view == null)
+        {
+            Log("the battle scene didn't open");
+            yield break;
+        }
+        yield return link.Fade(0f);
 
-        // the map with nothing fighting, as a baseline
+        // the battlefield with nothing fighting, as a baseline
         yield return new WaitForSeconds(3f);
         yield return Measure("no battle", 0);
 
@@ -115,6 +120,9 @@ public class BattleStress : MonoBehaviour
             }
         view.BakedFigures = wasBaked;
         Log("done");
+        yield return link.Fade(1f);
+        yield return link.Leave();
+        yield return link.Fade(0f);
     }
 
     List<ArmyEntry> Army(List<UnitType> types, int size, out int figures, out int riders)

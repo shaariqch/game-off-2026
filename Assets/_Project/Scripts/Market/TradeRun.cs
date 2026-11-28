@@ -153,6 +153,8 @@ public class TradeRun : MonoBehaviour
     [SerializeField] Vector2 enemyWorth = new Vector2(240f, 120f);
     [Tooltip("How many unit types the enemy brings, at least and at most.")]
     [SerializeField] Vector2Int enemyTypes = new Vector2Int(2, 3);
+    [Tooltip("The most soldiers an enemy army has, however much it's worth: bigger battles run slow in the browser (about 300 figures in all hold 60 fps).")]
+    [SerializeField, Min(1)] int maxEnemySoldiers = 150;
 
     [Header("Shift keys")]
     [Tooltip("Seconds between letting go and the trade going through.")]
@@ -259,7 +261,10 @@ public class TradeRun : MonoBehaviour
         switch (KindOf(order.row))
         {
             case RowKind.Unit:
-                return Market.Total(order.row, order.count, order.side == Side.Buy);
+                // squads: a sale may end in a part-squad that lost men in battle
+                return order.side == Side.Buy
+                    ? Market.Total(order.row, order.count, true)
+                    : Market.Total(order.row, SellShares(order.row, order.count), false);
             case RowKind.Tip:
                 int total = 0;
                 for (int i = 0; i < order.count; i++)
@@ -311,7 +316,27 @@ public class TradeRun : MonoBehaviour
     public bool IsKnown(MarketEvent marketEvent) => marketEvent.known || revealed.Contains(marketEvent);
     public bool WasTipped(MarketEvent marketEvent) => revealed.Contains(marketEvent);
 
+    /// <summary>Soldiers of a unit type held (each buy brings a squad of them).</summary>
     public int Held(int unit) => held[unit];
+
+    int SquadSize(int unit) => Mathf.Max(1, Unit(unit).squadSize);
+
+    /// <summary>Squads of a type held, counting a part-squad as one: what Sell can take.</summary>
+    int SquadsHeld(int unit) => (held[unit] + SquadSize(unit) - 1) / SquadSize(unit);
+
+    /// <summary>Soldiers an order moves: whole squads bought, or up to that many squads sold from what's held. Other rows: its count.</summary>
+    public int OrderSoldiers(Order order)
+    {
+        if (order == null)
+            return 0;
+        if (order.count <= 0 || KindOf(order.row) != RowKind.Unit)
+            return order.count;
+        int soldiers = order.count * SquadSize(order.row);
+        return order.side == Side.Buy ? soldiers : Mathf.Min(soldiers, held[order.row]);
+    }
+
+    /// <summary>Squads, as a share, that selling this many squads takes: the last may be a part-squad.</summary>
+    float SellShares(int unit, int squads) => Mathf.Min(squads * SquadSize(unit), held[unit]) / (float)SquadSize(unit);
     public int UnitCount => Market.listings.Count;
     public UnitType Unit(int index) => Market.listings[index].type;
     public bool HasHappened(MarketEvent marketEvent) => marketEvent.time <= PhaseTime;
@@ -416,14 +441,15 @@ public class TradeRun : MonoBehaviour
             lastPlace = place;
             var type = banditTypes[random.Next(banditTypes.Count)];
             float worth = (banditWorth.x + banditWorth.y * (Battle - 1)) * Mathf.Lerp(0.67f, 1.33f, (float)random.NextDouble());
-            int bandits = Mathf.Max(2, Mathf.RoundToInt(worth / Mathf.Max(1, type.cost)));
+            // sized as squads bought from a fresh market, as the player would pay for them
+            int bandits = Mathf.Max(2, Mathf.RoundToInt(Market.UnitsFor(type, worth) * type.squadSize));
             var raid = new Raid
             {
                 place = place,
                 text = string.Format(raidText, place),
                 opens = opens,
                 closes = Mathf.Min(opens + raidOpenFor, start + slot),
-                pay = Mathf.RoundToInt(bandits * type.cost * raidPay),
+                pay = Mathf.RoundToInt(bandits * type.SoldierValue * raidPay),
             };
             raid.bandits.Add(new ArmyEntry(type, bandits));
             raids.Add(raid);
@@ -518,11 +544,20 @@ public class TradeRun : MonoBehaviour
             total += shares[i];
         }
         float worth = enemyWorth.x + enemyWorth.y * (Battle - 1);
+        // each type's share is spent as the player would spend it: in squads, the price rising with each, so the
+        // enemy is worth what the player would have to pay for it, not its base cost (which made it about 1.7 times
+        // stronger than the same money could match)
+        var counts = new int[typeCount];
+        int soldiers = 0;
         for (int i = 0; i < typeCount; i++)
         {
-            int count = Mathf.Max(1, Mathf.RoundToInt(worth * shares[i] / total / types[i].cost));
-            enemy.Add(new EnemyGroup { type = types[i], count = count });
+            counts[i] = Mathf.Max(1, Mathf.RoundToInt(Market.UnitsFor(types[i], worth * shares[i] / total) * types[i].squadSize));
+            soldiers += counts[i];
         }
+        // past this many, battles run slow in the browser: the enemy stops growing in numbers there
+        float trim = soldiers > maxEnemySoldiers ? (float)maxEnemySoldiers / soldiers : 1f;
+        for (int i = 0; i < typeCount; i++)
+            enemy.Add(new EnemyGroup { type = types[i], count = Mathf.Max(1, Mathf.RoundToInt(counts[i] * trim)) });
         // in the list's order, so the enemy's rows line up with the market's
         enemy.Sort((a, b) => Market.IndexOf(a.type).CompareTo(Market.IndexOf(b.type)));
         var parts = new List<string>();
@@ -755,7 +790,7 @@ public class TradeRun : MonoBehaviour
         switch (KindOf(row))
         {
             case RowKind.Unit:
-                return side == Side.Buy ? Market.Affordable(row, Cash) : held[row];
+                return side == Side.Buy ? Market.Affordable(row, Cash) : SquadsHeld(row);
             case RowKind.Tip:
                 if (side == Side.Sell) return 0;
                 return Mathf.Min(AffordableTips(), Hidden().Count);
@@ -828,18 +863,19 @@ public class TradeRun : MonoBehaviour
         {
             var (bought, spent) = Market.Buy(unit, order.count, Cash);
             Cash -= spent;
-            held[unit] += bought;
-            Debug.Log($"[Trade] bought {bought} {Unit(unit).name} for {spent}, cash {Cash}");
+            held[unit] += bought * SquadSize(unit);
+            Debug.Log($"[Trade] bought {bought} squads of {Unit(unit).name} ({bought * SquadSize(unit)} soldiers) for {spent}, cash {Cash}");
             Traded?.Invoke(Side.Buy, unit, bought);
         }
         else
         {
-            int count = Mathf.Min(order.count, held[unit]);
-            int made = Market.Sell(unit, count);
+            int squads = Mathf.Min(order.count, SquadsHeld(unit));
+            int soldiers = Mathf.Min(squads * SquadSize(unit), held[unit]);
+            int made = Market.Sell(unit, soldiers / (float)SquadSize(unit));
             Cash += made;
-            held[unit] -= count;
-            Debug.Log($"[Trade] sold {count} {Unit(unit).name} for {made}, cash {Cash}");
-            Traded?.Invoke(Side.Sell, unit, count);
+            held[unit] -= soldiers;
+            Debug.Log($"[Trade] sold {soldiers} {Unit(unit).name} for {made}, cash {Cash}");
+            Traded?.Invoke(Side.Sell, unit, squads);
         }
         Reset(order);
     }
@@ -919,13 +955,13 @@ public class TradeRun : MonoBehaviour
         return army;
     }
 
-    /// <summary>What the enemy army is worth at cost.</summary>
+    /// <summary>What the enemy army is worth at cost (each soldier a share of his squad's cost).</summary>
     public int EnemyWorth()
     {
-        int worth = 0;
+        float worth = 0f;
         foreach (var group in enemy)
-            worth += group.count * group.type.cost;
-        return worth;
+            worth += group.count * group.type.SoldierValue;
+        return Mathf.RoundToInt(worth);
     }
 
     /// <summary>

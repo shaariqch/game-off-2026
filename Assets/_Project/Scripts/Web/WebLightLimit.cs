@@ -19,13 +19,28 @@ public class WebLightLimit : MonoBehaviour
     static void Create()
     {
         if (Application.platform != RuntimePlatform.WebGLPlayer) return;
-        new GameObject("Web Light Limit").AddComponent<WebLightLimit>();
+        var go = new GameObject("Web Light Limit");
+        // kept apart from the map, which BattleLink hides during a battle
+        DontDestroyOnLoad(go);
+        go.AddComponent<WebLightLimit>();
     }
 
     void Start()
     {
+        Collect();
+        // scenes loaded later (the battle scene) bring their own lights
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    void OnDestroy() => UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+
+    void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode) => Collect();
+
+    void Collect()
+    {
         foreach (var light in FindObjectsByType<Light>(FindObjectsInactive.Exclude))
-            if (light.type == LightType.Point && light.enabled) lights.Add(light);
+            if (light.type == LightType.Point && light.enabled && !lights.Contains(light)) lights.Add(light);
+        lights.RemoveAll(light => light == null);
     }
 
     void LateUpdate()
