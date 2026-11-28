@@ -79,8 +79,8 @@ public class TradeHud : MonoBehaviour
     int rowsForBattle = -1;
     readonly List<(MarketEvent marketEvent, VisualElement dot)> dots = new List<(MarketEvent, VisualElement)>();
     readonly List<Notice> shown = new List<Notice>();
-    // notices placed so far this frame at each place, so the next one there goes under them
-    readonly Dictionary<MapPlace, int> stacked = new Dictionary<MapPlace, int>();
+    // where notices have been placed so far this frame, so later ones move clear of them
+    readonly List<Rect> placed = new List<Rect>();
     Key buyKey, sellKey;
     int builtForBattle = -1;
     bool built;
@@ -542,7 +542,7 @@ public class TradeHud : MonoBehaviour
         var panel = hud.panel;
         if (cam == null || panel == null)
             return;
-        stacked.Clear();
+        placed.Clear();
         for (int i = shown.Count - 1; i >= 0; i--)
         {
             var notice = shown[i];
@@ -580,11 +580,28 @@ public class TradeHud : MonoBehaviour
                 marker.style.marginLeft = left ? 11 : 0;
                 float height = notice.root.resolvedStyle.height;
                 if (float.IsNaN(height)) height = 38f;
-                // several notices at one place stack downwards instead of covering each other
-                stacked.TryGetValue(notice.place, out int under);
-                stacked[notice.place] = under + 1;
-                notice.root.style.left = left ? point.x + 6f - (width + 23f) : point.x - 6f;
-                notice.root.style.top = point.y - height * 0.5f + under * (height + 4f);
+                // a notice that would cover one already placed (same town, or towns close together on screen)
+                // moves down below it; its marker stays on the town
+                float x = left ? point.x + 6f - (width + 23f) : point.x - 6f;
+                float y = point.y - height * 0.5f;
+                float shift = 0f;
+                for (int pass = 0; pass < 8; pass++)
+                {
+                    bool moved = false;
+                    var rect = new Rect(x, y + shift, width + 23f, height);
+                    foreach (var other in placed)
+                        if (other.Overlaps(rect))
+                        {
+                            shift = other.yMax + 4f - y;
+                            moved = true;
+                            break;
+                        }
+                    if (!moved) break;
+                }
+                placed.Add(new Rect(x, y + shift, width + 23f, height));
+                notice.root.style.left = x;
+                notice.root.style.top = y + shift;
+                marker.style.translate = new Translate(0, -shift);
             }
             else
             {

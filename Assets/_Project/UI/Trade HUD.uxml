@@ -24,6 +24,16 @@
             <ui:VisualElement name="unit-rows" />
         </ui:VisualElement>
 
+        <!-- what the dots on the timeline and the notices mean -->
+        <ui:VisualElement name="legend" class="panel" picking-mode="Ignore">
+            <ui:VisualElement class="legend-item"><ui:VisualElement class="legend-dot legend-dot--threat" /><ui:Label class="legend-label" text="Threat" /></ui:VisualElement>
+            <ui:VisualElement class="legend-item"><ui:VisualElement class="legend-dot legend-dot--news" /><ui:Label class="legend-label" text="News" /></ui:VisualElement>
+            <ui:VisualElement class="legend-item"><ui:VisualElement class="legend-dot legend-dot--raid" /><ui:Label class="legend-label" text="Raid" /></ui:VisualElement>
+            <ui:VisualElement class="legend-gap" />
+            <ui:VisualElement class="legend-item"><ui:VisualElement class="legend-dot legend-dot--ring" /><ui:Label class="legend-label" text="Coming up" /></ui:VisualElement>
+            <ui:VisualElement class="legend-item"><ui:VisualElement class="legend-dot legend-dot--filled" /><ui:Label class="legend-label" text="Happening" /></ui:VisualElement>
+        </ui:VisualElement>
+
         <ui:VisualElement name="controls" picking-mode="Ignore">
             <ui:VisualElement name="buy" class="key" />
             <ui:VisualElement name="trade" picking-mode="Ignore">
