@@ -444,4 +444,19 @@ MonoBehaviour:
     radius: 32
     level: 0.5
     roads: []
+  - name: 'Raid field: Harrowby'
+    centre: {x: 208.96, y: 213.64}
+    radius: 32
+    level: 0.5
+    roads: []
+  - name: 'Raid field: Highfield'
+    centre: {x: 223.51, y: 287.39}
+    radius: 32
+    level: 0.5
+    roads: []
+  - name: 'Raid field: Stonewatch'
+    centre: {x: 144.36, y: 586.97}
+    radius: 32
+    level: 0.5
+    roads: []
   road: {fileID: 8574412962073106934, guid: 224d63e1442241943b8cafe00b71bdbd, type: 2}

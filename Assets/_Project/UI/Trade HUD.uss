@@ -149,6 +149,31 @@
     border-bottom-color: rgb(224, 101, 79);
 }
 
+/* an event's numeral, over its dot; the same numeral is on its notice */
+.dot-number {
+    position: absolute;
+    bottom: 15px;
+    left: -10px;
+    width: 34px;
+    -unity-text-align: lower-center;
+    font-size: 11px;
+    color: rgb(241, 230, 208);
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* inside a ring's border */
+.dot--tipped .dot-number {
+    left: -13px;
+    bottom: 12px;
+}
+
 #battle-label {
     font-size: 16px;
     margin-right: 10px;
@@ -359,6 +384,11 @@
     border-right-width: 2px;
     border-top-width: 2px;
     border-bottom-width: 2px;
+}
+
+.notice-number {
+    font-size: 15px;
+    margin-right: 8px;
 }
 
 .notice-text {

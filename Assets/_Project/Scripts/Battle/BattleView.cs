@@ -380,11 +380,18 @@ public class BattleView : MonoBehaviour
     }
 
     /// <summary>Starts a battle between these armies (side A is the player's, side B the enemy's).</summary>
-    public void Begin(IList<ArmyEntry> a, IList<ArmyEntry> b)
+    public void Begin(IList<ArmyEntry> a, IList<ArmyEntry> b) => Begin(a, b, armyBHolds);
+
+    /// <summary>As <see cref="Begin(IList{ArmyEntry}, IList{ArmyEntry})"/>, choosing whether side B holds its ground
+    /// in this battle only.</summary>
+    public void Begin(IList<ArmyEntry> a, IList<ArmyEntry> b, bool bHolds)
     {
         armyA = new List<ArmyEntry>(a);
         armyB = new List<ArmyEntry>(b);
+        bool holds = armyBHolds;
+        armyBHolds = bHolds;
         Begin();
+        armyBHolds = holds;
     }
 
     /// <summary>The living units of a side, counted by type.</summary>

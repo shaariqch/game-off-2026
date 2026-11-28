@@ -23,6 +23,9 @@ public class TradeHud : MonoBehaviour
     [SerializeField] string tipDescription = "Reveals an event before it happens.";
     [Tooltip("Shown under an enemy row when it's selected.")]
     [SerializeField] string enemyDescription = "Scouting shows how many they have brought.";
+    [SerializeField] Texture2D raidIcon;
+    [Tooltip("Shown under the raid row when it's selected: {0} bandits, {1} the place, {2} the pay.")]
+    [SerializeField] string raidDescription = "{0} bandits near {1}. Your whole army rides out; a win pays {2}.";
 
     [Header("Notices")]
     [Tooltip("Notices above this or below the second (reference pixels from the top) show as a ping on that edge instead.")]
@@ -31,6 +34,7 @@ public class TradeHud : MonoBehaviour
     [SerializeField] float noticeRightLimit = 990f;
     [SerializeField] Color noticeColour = new Color(0.498f, 0.769f, 0.788f);
     [SerializeField] Color invasionColour = new Color(0.878f, 0.396f, 0.31f);
+    [SerializeField] Color raidColour = new Color(0.89f, 0.72f, 0.4f);
 
     [Header("Trade bar")]
     [Tooltip("Seconds the bar stays full after a trade goes through, while its word shows, before it fades.")]
@@ -53,7 +57,9 @@ public class TradeHud : MonoBehaviour
 
     sealed class Notice
     {
+        /// <summary>The event it's for, or null for a raid's notice.</summary>
         public MarketEvent marketEvent;
+        public TradeRun.Raid raid;
         public MapPlace place;
         public VisualElement root, panel, ping, dot;
         public HudShape chevron;
@@ -113,6 +119,7 @@ public class TradeHud : MonoBehaviour
         run.EventStarted += OnEventStarted;
         run.Tipped += OnTipped;
         run.Traded += OnTraded;
+        run.RaidOpened += OnRaidOpened;
         tradedAt = float.NegativeInfinity;
         built = true;
     }
@@ -124,6 +131,7 @@ public class TradeHud : MonoBehaviour
             run.EventStarted -= OnEventStarted;
             run.Tipped -= OnTipped;
             run.Traded -= OnTraded;
+            run.RaidOpened -= OnRaidOpened;
         }
         built = false;
     }
@@ -155,6 +163,7 @@ public class TradeHud : MonoBehaviour
             {
                 TradeRun.RowKind.Unit => (run.Unit(i).icon, run.Unit(i).name),
                 TradeRun.RowKind.Tip => (tipIcon, "Tip"),
+                TradeRun.RowKind.Raid => (raidIcon != null ? raidIcon : battleIcon, "Raid"),
                 _ => (run.EnemyAt(i).type.icon, run.EnemyAt(i).type.name),
             };
             var row = new Row { kind = kind, root = new VisualElement() };
@@ -196,7 +205,7 @@ public class TradeHud : MonoBehaviour
         description.name = "description";
         description.AddToClassList("muted");
         unitRows.Add(description);
-        rowsForBattle = run.Battle;
+        rowsForBattle = run.Phase;
     }
 
     VisualElement Header(string title, string held, string price)
@@ -267,10 +276,16 @@ public class TradeHud : MonoBehaviour
             dot.AddToClassList("dot");
             dot.AddToClassList(marketEvent.category == MarketEvent.Category.Invasion ? "dot--invasion" : "dot--notice");
             dot.style.left = Length.Percent(100f * Mathf.Clamp01(marketEvent.time / run.PhaseLength));
+            // the same numeral as its notice, so the two can be matched
+            var number = new Label(TradeRun.Roman(run.Number(marketEvent)));
+            number.AddToClassList("serif");
+            number.AddToClassList("dot-number");
+            number.pickingMode = PickingMode.Ignore;
+            dot.Add(number);
             eventDots.Add(dot);
             dots.Add((marketEvent, dot));
         }
-        builtForBattle = run.Battle;
+        builtForBattle = run.Phase;
     }
 
     void OnEventStarted(MarketEvent marketEvent)
@@ -286,18 +301,25 @@ public class TradeHud : MonoBehaviour
         ShowNotice(marketEvent, false);
     }
 
-    void OnTipped(MarketEvent marketEvent) => ShowNotice(marketEvent, true);
+    void OnTipped(MarketEvent marketEvent) => ShowNotice(marketEvent, null, true);
 
-    void ShowNotice(MarketEvent marketEvent, bool pending)
+    void OnRaidOpened(TradeRun.Raid raid) => ShowNotice(null, raid, false);
+
+    void ShowNotice(MarketEvent marketEvent, bool pending) => ShowNotice(marketEvent, null, pending);
+
+    /// <summary>A notice pinned to the place of an event, or of a raid (<paramref name="marketEvent"/> null).</summary>
+    void ShowNotice(MarketEvent marketEvent, TradeRun.Raid raid, bool pending)
     {
-        var place = MapPlace.Find(marketEvent.place);
+        string placeName = marketEvent != null ? marketEvent.place : raid.place;
+        string message = marketEvent != null ? marketEvent.text : raid.text;
+        var place = MapPlace.Find(placeName);
         if (place == null)
         {
-            Debug.LogWarning($"No MapPlace called {marketEvent.place} for the event \"{marketEvent.text}\".", this);
+            Debug.LogWarning($"No MapPlace called {placeName} for \"{message}\".", this);
             return;
         }
-        var colour = Colour(marketEvent);
-        var notice = new Notice { marketEvent = marketEvent, place = place, root = new VisualElement() };
+        var colour = marketEvent != null ? Colour(marketEvent) : raidColour;
+        var notice = new Notice { marketEvent = marketEvent, raid = raid, place = place, root = new VisualElement() };
         notice.root.AddToClassList("notice");
         notice.root.pickingMode = PickingMode.Ignore;
         var marker = new VisualElement();
@@ -311,7 +333,14 @@ public class TradeHud : MonoBehaviour
         notice.dot.style.borderLeftColor = notice.dot.style.borderRightColor =
             notice.dot.style.borderTopColor = notice.dot.style.borderBottomColor = colour;
         notice.panel.Add(notice.dot);
-        var text = new Label(marketEvent.text);
+        if (marketEvent != null)
+        {
+            var number = new Label(TradeRun.Roman(run.Number(marketEvent)));
+            number.AddToClassList("serif");
+            number.AddToClassList("notice-number");
+            notice.panel.Add(number);
+        }
+        var text = new Label(message);
         text.AddToClassList("notice-text");
         notice.panel.Add(text);
         notice.root.Add(notice.panel);
@@ -337,7 +366,8 @@ public class TradeHud : MonoBehaviour
     {
         notice.pending = pending;
         notice.dot.EnableInClassList("notice-dot--pending", pending);
-        notice.dot.style.backgroundColor = pending ? Color.clear : Colour(notice.marketEvent);
+        notice.dot.style.backgroundColor = pending ? Color.clear
+            : notice.marketEvent != null ? Colour(notice.marketEvent) : raidColour;
     }
 
     Color Colour(MarketEvent marketEvent) =>
@@ -347,9 +377,17 @@ public class TradeHud : MonoBehaviour
     {
         if (!built || run == null || run.Market == null)
             return;
-        if (builtForBattle != run.Battle || dots.Count != run.Events.Count)
+        if (builtForBattle != run.Phase || dots.Count != run.Events.Count)
+        {
+            // a new phase has new events: the old phase's notices go
+            if (builtForBattle != run.Phase)
+            {
+                notices.Clear();
+                shown.Clear();
+            }
             BuildDots();
-        if (rowsForBattle != run.Battle || rows.Count != run.RowCount)
+        }
+        if (rowsForBattle != run.Phase || rows.Count != run.RowCount)
             BuildRows();
 
         hud.EnableInClassList("hud--battle", run.AtBattle);
@@ -393,6 +431,12 @@ public class TradeHud : MonoBehaviour
                     row.held.text = "";
                     row.price.text = run.TipPrice.ToString();
                     break;
+                case TradeRun.RowKind.Raid:
+                    // the bandits under Held, the pay under Price
+                    row.held.text = run.OpenRaid != null ? run.OpenRaid.BanditCount.ToString() : "";
+                    row.held.EnableInClassList("unit-held--none", false);
+                    row.price.text = run.OpenRaid != null ? "+" + run.OpenRaid.pay : "";
+                    break;
                 default:
                     var group = run.EnemyAt(i);
                     row.held.text = group.scouted ? group.count.ToString() : "?";
@@ -411,6 +455,8 @@ public class TradeHud : MonoBehaviour
         {
             TradeRun.RowKind.Unit => run.Unit(run.Selected).description,
             TradeRun.RowKind.Tip => tipDescription,
+            TradeRun.RowKind.Raid => run.OpenRaid == null ? ""
+                : string.Format(raidDescription, run.OpenRaid.BanditCount, run.OpenRaid.place, run.OpenRaid.pay),
             _ => enemyDescription,
         };
         description.style.display = mapFocus ? DisplayStyle.None : DisplayStyle.Flex;
@@ -431,7 +477,7 @@ public class TradeHud : MonoBehaviour
         key.root.EnableInClassList("key--holding", order.state == TradeRun.OrderState.Holding);
         key.root.EnableInClassList("key--other", idle && other.state != TradeRun.OrderState.Idle);
         key.root.EnableInClassList("key--has-count", !idle);
-        // tips and scouting can only be bought
+        // tips, raids and scouting can only be bought
         bool noSelling = order.side == TradeRun.Side.Sell && idle && run.KindOf(run.Selected) != TradeRun.RowKind.Unit;
         key.root.EnableInClassList("key--closed", run.AtBattle || noSelling);
         key.count.text = order.side == TradeRun.Side.Buy ? "+" + order.count : "−" + order.count;
@@ -480,8 +526,11 @@ public class TradeHud : MonoBehaviour
         for (int i = shown.Count - 1; i >= 0; i--)
         {
             var notice = shown[i];
-            // a notice stays up while its event is still to come (known from a tip) or still moves the market
-            bool over = run.HasHappened(notice.marketEvent) && run.Market.Strength(notice.marketEvent) <= 0f;
+            // a notice stays up while its event is still to come (known from a tip) or still moves the market, and a
+            // raid's while it's in the list
+            bool over = notice.marketEvent != null
+                ? run.HasHappened(notice.marketEvent) && run.Market.Strength(notice.marketEvent) <= 0f
+                : notice.raid != run.OpenRaid;
             if (over || notice.place == null)
             {
                 notice.root.RemoveFromHierarchy();
@@ -489,8 +538,14 @@ public class TradeHud : MonoBehaviour
                 shown.RemoveAt(i);
                 continue;
             }
-            var point = RuntimePanelUtils.CameraTransformWorldToPanel(panel, notice.place.transform.position, cam);
-            bool above = point.y < noticeBand.x, below = point.y > noticeBand.y;
+            var position = notice.place.transform.position;
+            // a place behind the camera projects flipped, onto the top of the screen; on this map that's south of the
+            // view, so it belongs on the bottom edge (it once pinged "further up" with the map scrolled to the top)
+            bool behind = cam.WorldToViewportPoint(position).z <= 0f;
+            if (behind)
+                position.z = cam.transform.position.z + 1f;
+            var point = RuntimePanelUtils.CameraTransformWorldToPanel(panel, position, cam);
+            bool above = !behind && point.y < noticeBand.x, below = behind || point.y > noticeBand.y;
             bool inView = !above && !below;
             notice.root.style.display = inView ? DisplayStyle.Flex : DisplayStyle.None;
             notice.ping.style.display = inView ? DisplayStyle.None : DisplayStyle.Flex;

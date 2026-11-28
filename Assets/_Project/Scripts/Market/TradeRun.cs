@@ -12,16 +12,20 @@ using UnityEngine.InputSystem.Controls;
 /// The keys follow the design doc: holding a Shift key counts up the number of units on it (slowly, then faster, up
 /// to what can be afforded or is held); letting go starts a short countdown; when it runs out the trade goes through
 /// at the price then. The same key again before that carries on counting and restarts the countdown, the other key
-/// cancels, and moving the selection makes it go through at once. Battles aren't joined up yet: when the timeline
-/// reaches one, trading stops and Enter starts the next trading phase.
+/// cancels, and moving the selection makes it go through at once. When the timeline reaches the battle, trading stops
+/// and whoever listens to <see cref="BattleReached"/> fights it (with no one listening, Enter skips it).
+///
+/// Each trading phase draws its events at random from the pool, at random times, so they can overlap and pull the
+/// same price both ways (their pushes add up). Raids open in the list for a while; Left Shift on one sends the whole
+/// army, the timeline stops while it fights (<see cref="RaidReached"/>), and a win pays cash.
 /// </remarks>
 [DefaultExecutionOrder(-50)] // the HUD reads the market in its OnEnable
 public class TradeRun : MonoBehaviour
 {
     public enum Focus { Map, Units }
     public enum Side { Buy, Sell }
-    /// <summary>What a row of the list is: a unit type on the market, the tip, or a type the enemy has brought.</summary>
-    public enum RowKind { Unit, Tip, Enemy }
+    /// <summary>What a row of the list is: a unit type on the market, the tip, an open raid, or a type the enemy has brought.</summary>
+    public enum RowKind { Unit, Tip, Raid, Enemy }
     public enum OrderState { Idle, Holding, Counting }
     /// <summary>Something a Shift key did, for the HUD's feedback.</summary>
     public enum KeyMoment
@@ -46,6 +50,28 @@ public class TradeRun : MonoBehaviour
         public UnitType type;
         public int count;
         public bool scouted;
+    }
+
+    /// <summary>Bandits raiding near a town: open in the list for a while, where Left Shift sends the whole army.</summary>
+    public sealed class Raid
+    {
+        public string place;
+        public string text;
+        /// <summary>Timeline seconds when it shows in the list, and when the bandits are gone if no one has come.</summary>
+        public float opens, closes;
+        public readonly List<ArmyEntry> bandits = new List<ArmyEntry>();
+        public int pay;
+
+        public int BanditCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (var entry in bandits)
+                    count += entry.count;
+                return count;
+            }
+        }
     }
 
     public sealed class Order
@@ -80,8 +106,33 @@ public class TradeRun : MonoBehaviour
 
     [Header("Market")]
     [SerializeField] Market.Settings marketSettings = Market.Settings.Default;
-    [Tooltip("Placeholder events, fired at fixed times in every trading phase.")]
+    [Tooltip("The events a trading phase draws from. Each phase picks some at random and gives them random times (the " +
+             "times and Known here are ignored), so they can overlap and pull the same price both ways.")]
     [SerializeField] List<MarketEvent> events = new List<MarketEvent>();
+    [Tooltip("How many events a trading phase draws, at least and at most.")]
+    [SerializeField] Vector2Int eventsPerPhase = new Vector2Int(4, 6);
+    [Tooltip("Timeline seconds: drawn events fall between these.")]
+    [SerializeField] Vector2 eventWindow = new Vector2(6f, 66f);
+    [Tooltip("The chance a drawn event shows on the timeline from the start; the rest are hidden until they happen or a tip reveals them.")]
+    [SerializeField, Range(0f, 1f)] float knownChance = 0.5f;
+
+    [Header("Raids")]
+    [Tooltip("How many raids a trading phase has, at least and at most. Only one is open at a time.")]
+    [SerializeField] Vector2Int raidsPerPhase = new Vector2Int(1, 2);
+    [Tooltip("Timeline seconds: raids open between these.")]
+    [SerializeField] Vector2 raidWindow = new Vector2(10f, 60f);
+    [Tooltip("Timeline seconds a raid stays in the list before the bandits are gone.")]
+    [SerializeField, Min(1f)] float raidOpenFor = 14f;
+    [Tooltip("Places raids happen at (MapPlace names). Each is fought at the raid site of that name under the battle rig, or at the battle site.")]
+    [SerializeField] List<string> raidPlaces = new List<string>();
+    [Tooltip("The notice on the map; {0} is the place.")]
+    [SerializeField] string raidText = "Bandits are raiding the farms near {0}.";
+    [Tooltip("What bandits can be; each raid is one of them.")]
+    [SerializeField] List<UnitType> banditTypes = new List<UnitType>();
+    [Tooltip("What a raid's bandits are worth at cost before the first battle, and what each later battle adds. Each raid is a third more or less at random.")]
+    [SerializeField] Vector2 banditWorth = new Vector2(60f, 30f);
+    [Tooltip("Cash for beating a raid, as a share of the bandits' worth at cost.")]
+    [SerializeField, Min(0f)] float raidPay = 1.2f;
 
     [Header("Intel")]
     [Tooltip("Cash for a tip, which reveals one random event still to come in this trading phase.")]
@@ -121,6 +172,8 @@ public class TradeRun : MonoBehaviour
     [SerializeField] AudioClip focusClip;
     [SerializeField] AudioClip noticeClip;
     [SerializeField] AudioClip invasionClip;
+    // TODO: a raid sound (a distant alarm bell or horn) for when a raid opens; until then the invasion clip plays
+    [SerializeField] AudioClip raidClip;
     [Tooltip("The timeline reaches the battle and trading stops.")]
     [SerializeField] AudioClip battleClip;
 
@@ -128,6 +181,8 @@ public class TradeRun : MonoBehaviour
     public int Cash { get; private set; }
     public int Selected { get; private set; }
     public Focus CurrentFocus { get; private set; } = Focus.Units;
+    /// <summary>Counts every trading phase started, across runs, so the HUD knows when the events are new.</summary>
+    public int Phase { get; private set; }
     /// <summary>Seconds into this trading phase.</summary>
     public float PhaseTime { get; private set; }
     public float PhaseLength => phaseLength;
@@ -137,7 +192,8 @@ public class TradeRun : MonoBehaviour
     /// <summary>The timeline has reached the battle and trading has stopped.</summary>
     public bool AtBattle { get; private set; }
     public float Countdown => countdown;
-    public IReadOnlyList<MarketEvent> Events => events;
+    /// <summary>This trading phase's events, in time order.</summary>
+    public IReadOnlyList<MarketEvent> Events => phaseEvents;
     public readonly Order buy = new Order { side = Side.Buy };
     public readonly Order sell = new Order { side = Side.Sell };
 
@@ -154,23 +210,46 @@ public class TradeRun : MonoBehaviour
     public event Action BattleReached;
     /// <summary>A battle has been fought: won or not, and the cash it paid.</summary>
     public event Action<bool, int> BattleEnded;
+    /// <summary>A raid has opened in the list.</summary>
+    public event Action<Raid> RaidOpened;
+    /// <summary>The army has ridden out to a raid. Whoever fights it calls <see cref="EndRaid"/> afterwards; with no
+    /// one listening, raids can't be answered.</summary>
+    public event Action<Raid> RaidReached;
+    /// <summary>A raid has been fought: won or not, and the cash it paid.</summary>
+    public event Action<bool, int> RaidEnded;
 
-    /// <summary>A battle is being fought on the map (trading has stopped and someone took the battle).</summary>
+    /// <summary>A battle or raid is being fought on the map (trading has stopped and someone took the fight).</summary>
     public bool Fighting { get; private set; }
+    /// <summary>The army is out at a raid and the timeline has stopped.</summary>
+    public bool Raiding { get; private set; }
+    /// <summary>The raid in the list now, if any.</summary>
+    public Raid OpenRaid { get; private set; }
+    /// <summary>The raid being fought, if any.</summary>
+    public Raid CurrentRaid { get; private set; }
 
     int[] held;
     int runSeed;
     readonly List<EnemyGroup> enemy = new List<EnemyGroup>();
     readonly HashSet<MarketEvent> revealed = new HashSet<MarketEvent>();
     readonly List<MarketEvent> hidden = new List<MarketEvent>();
+    readonly List<MarketEvent> phaseEvents = new List<MarketEvent>();
+    readonly List<Raid> raids = new List<Raid>();
+    int nextRaid;
 
     public IReadOnlyList<EnemyGroup> Enemy => enemy;
     public int TipPrice => tipPrice;
     public int ScoutPrice => scoutPrice;
-    /// <summary>Units, then the tip, then the enemy's types.</summary>
-    public int RowCount => UnitCount + 1 + enemy.Count;
-    public RowKind KindOf(int row) => row < UnitCount ? RowKind.Unit : row == UnitCount ? RowKind.Tip : RowKind.Enemy;
-    public EnemyGroup EnemyAt(int row) => enemy[row - UnitCount - 1];
+    /// <summary>Units, then the tip, then the open raid (if any), then the enemy's types.</summary>
+    public int RowCount => FirstEnemyRow + enemy.Count;
+    int FirstEnemyRow => UnitCount + 1 + (OpenRaid != null ? 1 : 0);
+    public RowKind KindOf(int row) =>
+        row < UnitCount ? RowKind.Unit
+        : row == UnitCount ? RowKind.Tip
+        : row < FirstEnemyRow ? RowKind.Raid
+        : RowKind.Enemy;
+    public EnemyGroup EnemyAt(int row) => enemy[row - FirstEnemyRow];
+    /// <summary>An event's number in this phase, from 1 in time order, as the timeline and its notice show it.</summary>
+    public int Number(MarketEvent marketEvent) => phaseEvents.IndexOf(marketEvent) + 1;
     /// <summary>Shown on the timeline before it happens: known from the start, or revealed by a tip.</summary>
     public bool IsKnown(MarketEvent marketEvent) => marketEvent.known || revealed.Contains(marketEvent);
     public bool WasTipped(MarketEvent marketEvent) => revealed.Contains(marketEvent);
@@ -204,14 +283,156 @@ public class TradeRun : MonoBehaviour
 
     void StartPhase()
     {
+        Phase++;
         PhaseTime = 0f;
         AtBattle = false;
         Fighting = false;
         Reset(buy);
         Reset(sell);
+        Raiding = false;
+        CurrentRaid = null;
         revealed.Clear();
         MakeEnemy();
+        MakeEvents();
+        MakeRaids();
         Selected = Mathf.Clamp(Selected, 0, RowCount - 1);
+    }
+
+    /// <summary>Draws this phase's events from the pool, at random times.</summary>
+    void MakeEvents()
+    {
+        phaseEvents.Clear();
+        var random = new System.Random(unchecked(runSeed * 131 + Battle * 7 + 1));
+        var pool = new List<MarketEvent>();
+        foreach (var marketEvent in events)
+            if (marketEvent != null && marketEvent.affects != null)
+                pool.Add(marketEvent);
+        int count = Mathf.Min(pool.Count, random.Next(eventsPerPhase.x, eventsPerPhase.y + 1));
+        for (int i = 0; i < count; i++)
+        {
+            int pick = random.Next(i, pool.Count);
+            (pool[i], pool[pick]) = (pool[pick], pool[i]);
+            var source = pool[i];
+            phaseEvents.Add(new MarketEvent
+            {
+                time = Mathf.Lerp(eventWindow.x, eventWindow.y, (float)random.NextDouble()),
+                category = source.category,
+                place = source.place,
+                text = source.text,
+                affects = source.affects,
+                strength = source.strength,
+                known = random.NextDouble() < knownChance,
+            });
+        }
+        phaseEvents.Sort((a, b) => a.time.CompareTo(b.time));
+        var parts = new List<string>();
+        foreach (var marketEvent in phaseEvents)
+            parts.Add($"{Roman(Number(marketEvent))} {marketEvent.time:0}s {marketEvent.affects.name} " +
+                      $"{marketEvent.strength:+0.0;-0.0}{(marketEvent.known ? "" : " hidden")}");
+        Debug.Log($"[Trade] battle {Battle} events: {string.Join(", ", parts)}");
+    }
+
+    /// <summary>Sets this phase's raids: one at a time, each opening somewhere in its share of the raid window.</summary>
+    void MakeRaids()
+    {
+        raids.Clear();
+        OpenRaid = null;
+        nextRaid = 0;
+        if (raidPlaces.Count == 0 || banditTypes.Count == 0)
+            return;
+        var random = new System.Random(unchecked(runSeed * 977 + Battle * 13 + 5));
+        int count = random.Next(raidsPerPhase.x, raidsPerPhase.y + 1);
+        float slot = (raidWindow.y - raidWindow.x) / Mathf.Max(1, count);
+        string lastPlace = null;
+        for (int i = 0; i < count; i++)
+        {
+            float start = raidWindow.x + slot * i;
+            float opens = start + (float)random.NextDouble() * Mathf.Max(0f, slot - raidOpenFor);
+            string place = raidPlaces[random.Next(raidPlaces.Count)];
+            if (place == lastPlace && raidPlaces.Count > 1)
+                place = raidPlaces[(raidPlaces.IndexOf(place) + 1 + random.Next(raidPlaces.Count - 1)) % raidPlaces.Count];
+            lastPlace = place;
+            var type = banditTypes[random.Next(banditTypes.Count)];
+            float worth = (banditWorth.x + banditWorth.y * (Battle - 1)) * Mathf.Lerp(0.67f, 1.33f, (float)random.NextDouble());
+            int bandits = Mathf.Max(2, Mathf.RoundToInt(worth / Mathf.Max(1, type.cost)));
+            var raid = new Raid
+            {
+                place = place,
+                text = string.Format(raidText, place),
+                opens = opens,
+                closes = Mathf.Min(opens + raidOpenFor, start + slot),
+                pay = Mathf.RoundToInt(bandits * type.cost * raidPay),
+            };
+            raid.bandits.Add(new ArmyEntry(type, bandits));
+            raids.Add(raid);
+            Debug.Log($"[Trade] battle {Battle} raid at {raid.opens:0}s near {place}: {bandits} {type.name}, pays {raid.pay}");
+        }
+    }
+
+    /// <summary>Opens the next raid in the list when its time comes, and takes it away when the bandits are gone.</summary>
+    void UpdateRaids()
+    {
+        if (OpenRaid != null && PhaseTime >= OpenRaid.closes)
+        {
+            Debug.Log($"[Trade] the raid near {OpenRaid.place} is over: no one came");
+            RemoveRaidRow();
+        }
+        if (OpenRaid == null && nextRaid < raids.Count && PhaseTime >= raids[nextRaid].opens)
+        {
+            // the rows after the tip move down one, and so does anything selected or pending on them
+            int raidRow = UnitCount + 1;
+            if (Selected >= raidRow) Selected++;
+            if (buy.state != OrderState.Idle && buy.row >= raidRow) buy.row++;
+            if (sell.state != OrderState.Idle && sell.row >= raidRow) sell.row++;
+            OpenRaid = raids[nextRaid++];
+            Play(raidClip != null ? raidClip : invasionClip);
+            RaidOpened?.Invoke(OpenRaid);
+            Debug.Log($"[Trade] raid: {OpenRaid.text}");
+        }
+    }
+
+    void RemoveRaidRow()
+    {
+        if (OpenRaid == null)
+            return;
+        int raidRow = UnitCount + 1;
+        foreach (var order in new[] { buy, sell })
+        {
+            if (order.state == OrderState.Idle) continue;
+            if (order.row == raidRow)
+            {
+                Reset(order);
+                KeyMoved?.Invoke(order.side, KeyMoment.Cancelled, 0);
+            }
+            else if (order.row > raidRow) order.row--;
+        }
+        OpenRaid = null;
+        if (Selected > raidRow) Selected--;
+        Selected = Mathf.Clamp(Selected, 0, RowCount - 1);
+    }
+
+    int ArmySize()
+    {
+        int size = 0;
+        foreach (int count in held)
+            size += count;
+        return size;
+    }
+
+    /// <summary>1 to 3999 in Roman numerals.</summary>
+    public static string Roman(int number)
+    {
+        if (number <= 0) return "";
+        var values = new[] { 1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1 };
+        var letters = new[] { "M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I" };
+        var text = new System.Text.StringBuilder();
+        for (int i = 0; i < values.Length; i++)
+            while (number >= values[i])
+            {
+                text.Append(letters[i]);
+                number -= values[i];
+            }
+        return text.ToString();
     }
 
     /// <summary>
@@ -252,7 +473,7 @@ public class TradeRun : MonoBehaviour
     List<MarketEvent> Hidden()
     {
         hidden.Clear();
-        foreach (var marketEvent in events)
+        foreach (var marketEvent in phaseEvents)
             if (marketEvent.time > PhaseTime && !IsKnown(marketEvent))
                 hidden.Add(marketEvent);
         return hidden;
@@ -263,6 +484,10 @@ public class TradeRun : MonoBehaviour
         float dt = Time.deltaTime;
         var keyboard = Keyboard.current;
         bool input = keyboard != null && !GameInput.Blocked;
+
+        // the timeline waits while the army is out at a raid
+        if (Raiding)
+            return;
 
         if (AtBattle)
         {
@@ -284,7 +509,7 @@ public class TradeRun : MonoBehaviour
         float phaseDt = dt * pace;
         float before = PhaseTime;
         PhaseTime = Mathf.Min(PhaseTime + phaseDt, phaseLength);
-        foreach (var marketEvent in events)
+        foreach (var marketEvent in phaseEvents)
         {
             if (marketEvent.time > before && marketEvent.time <= PhaseTime)
             {
@@ -295,6 +520,7 @@ public class TradeRun : MonoBehaviour
             }
         }
         Market.Tick(phaseDt);
+        UpdateRaids();
 
         if (input)
         {
@@ -304,12 +530,17 @@ public class TradeRun : MonoBehaviour
         }
         RunCountdown(buy, dt);
         RunCountdown(sell, dt);
+        if (Raiding)
+            return;
 
         if (PhaseTime >= phaseLength)
         {
             // whatever is still pending goes through before the battle
             Complete(buy);
             Complete(sell);
+            if (Raiding)
+                return;
+            RemoveRaidRow();
             AtBattle = true;
             Play(battleClip);
             Fighting = BattleReached != null;
@@ -362,7 +593,7 @@ public class TradeRun : MonoBehaviour
             }
             else if (mine.side == Side.Sell && KindOf(Selected) != RowKind.Unit)
             {
-                // tips and scouting can only be bought; the sell key does nothing on them
+                // tips, raids and scouting can only be bought; the sell key does nothing on them
                 mine.spent = true;
             }
             else if (mine.state == OrderState.Counting && mine.row == Selected)
@@ -463,6 +694,9 @@ public class TradeRun : MonoBehaviour
             case RowKind.Tip:
                 if (side == Side.Sell) return 0;
                 return Mathf.Min(tipPrice > 0 ? Cash / tipPrice : 99, Hidden().Count);
+            case RowKind.Raid:
+                // the whole army goes, once
+                return side == Side.Buy && RaidReached != null && ArmySize() > 0 ? 1 : 0;
             default:
                 var group = EnemyAt(row);
                 return side == Side.Buy && !group.scouted && Cash >= scoutPrice ? 1 : 0;
@@ -498,6 +732,16 @@ public class TradeRun : MonoBehaviour
             }
             Traded?.Invoke(Side.Buy, order.row, count);
         }
+        else if (KindOf(order.row) == RowKind.Raid)
+        {
+            var raid = OpenRaid;
+            bool go = order.side == Side.Buy && Cap(Side.Buy, order.row) > 0;
+            Traded?.Invoke(Side.Buy, order.row, go ? 1 : 0);
+            Reset(order);
+            if (go)
+                StartRaid(raid);
+            return;
+        }
         else if (KindOf(order.row) == RowKind.Enemy)
         {
             var group = EnemyAt(order.row);
@@ -528,6 +772,42 @@ public class TradeRun : MonoBehaviour
             Traded?.Invoke(Side.Sell, unit, count);
         }
         Reset(order);
+    }
+
+    void StartRaid(Raid raid)
+    {
+        RemoveRaidRow();
+        CurrentRaid = raid;
+        Raiding = true;
+        Fighting = true;
+        Debug.Log($"[Trade] the army rides out to the raid near {raid.place}: {ArmyText()} against {raid.BanditCount} bandits");
+        RaidReached?.Invoke(raid);
+    }
+
+    /// <summary>After a raid: the survivors are the army now, a win pays, and the timeline carries on.</summary>
+    public void EndRaid(IList<ArmyEntry> survivors, bool won)
+    {
+        if (!Raiding)
+            return;
+        SetArmy(survivors);
+        int pay = won && CurrentRaid != null ? CurrentRaid.pay : 0;
+        Cash += pay;
+        Debug.Log($"[Trade] raid {(won ? "won" : "lost")}, paid {pay}, army now {ArmyText()}, cash {Cash}");
+        Raiding = false;
+        Fighting = false;
+        CurrentRaid = null;
+        RaidEnded?.Invoke(won, pay);
+    }
+
+    void SetArmy(IList<ArmyEntry> survivors)
+    {
+        for (int i = 0; i < held.Length; i++)
+            held[i] = 0;
+        foreach (var entry in survivors)
+        {
+            int index = Market.IndexOf(entry.type);
+            if (index >= 0) held[index] += entry.count;
+        }
     }
 
     static void Reset(Order order)
@@ -573,13 +853,7 @@ public class TradeRun : MonoBehaviour
     {
         if (!AtBattle)
             return;
-        for (int i = 0; i < held.Length; i++)
-            held[i] = 0;
-        foreach (var entry in survivors)
-        {
-            int index = Market.IndexOf(entry.type);
-            if (index >= 0) held[index] += entry.count;
-        }
+        SetArmy(survivors);
         int pay = won ? Mathf.RoundToInt(EnemyWorth() * winPay) : 0;
         Cash += pay;
         Debug.Log($"[Trade] battle {Battle} {(won ? "won" : "lost")}, paid {pay}, army now {ArmyText()}, cash {Cash}");

@@ -1211,6 +1211,37 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapPlace
   placeName: Stonewatch
+--- !u!1 &97685851
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 97685852}
+  m_Layer: 0
+  m_Name: Highfield
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &97685852
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 97685851}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 223.51, y: 3.3157024, z: 287.39}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 420136575}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &100514898
 GameObject:
   m_ObjectHideFlags: 0
@@ -3022,6 +3053,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4114268852526130, guid: 8c92b343afee97e42b3af77116a91ed2, type: 3}
   m_PrefabInstance: {fileID: 386975557}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &387148171
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 387148172}
+  m_Layer: 0
+  m_Name: Millbrook
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &387148172
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 387148171}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 223, y: 8.388601, z: 464}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 420136575}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &394957732
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3154,6 +3216,41 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4410224853831496, guid: 8dadbdebd7aa1a84e90341a7c4efd21d, type: 3}
   m_PrefabInstance: {fileID: 412205215}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &420136574
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 420136575}
+  m_Layer: 0
+  m_Name: Raid Sites
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &420136575
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 420136574}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 387148172}
+  - {fileID: 1439805564}
+  - {fileID: 97685852}
+  - {fileID: 948355646}
+  m_Father: {fileID: 2040131172}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &435484112
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -8683,11 +8780,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7481130337564779861, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7481130337564779861, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_Shadows.m_Type
-      value: 0
+      value: 2
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -10488,6 +10585,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4114268852526130, guid: 8c92b343afee97e42b3af77116a91ed2, type: 3}
   m_PrefabInstance: {fileID: 940744288}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &948355645
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 948355646}
+  m_Layer: 0
+  m_Name: Stonewatch
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &948355646
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 948355645}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 144.36, y: 7.078081, z: 586.97}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 420136575}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &959288332
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -15745,6 +15873,37 @@ Transform:
   - {fileID: 1230683909}
   m_Father: {fileID: 485086549}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1439805563
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1439805564}
+  m_Layer: 0
+  m_Name: Harrowby
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1439805564
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1439805563}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 208.96, y: 2.6310234, z: 213.64}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 420136575}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1441980783
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -19650,10 +19809,13 @@ MonoBehaviour:
   tipIcon: {fileID: 2800000, guid: 82bdc4654d4ba0c4a81714ded445549e, type: 3}
   tipDescription: Reveals an event before it happens.
   enemyDescription: Scouting shows how many they have brought.
+  raidIcon: {fileID: 0}
+  raidDescription: '{0} bandits near {1}. Your whole army rides out; a win pays {2}.'
   noticeBand: {x: 96, y: 650}
   noticeRightLimit: 1108
   noticeColour: {r: 0.498, g: 0.769, b: 0.788, a: 1}
   invasionColour: {r: 0.878, g: 0.396, b: 0.31, a: 1}
+  raidColour: {r: 0.89, g: 0.72, b: 0.4, a: 1}
   tradeHold: 0.9
 --- !u!114 &1909177706
 MonoBehaviour:
@@ -19711,34 +19873,134 @@ MonoBehaviour:
     eventFade: 45
     trendWindow: 4
   events:
-  - time: 12
+  - time: 0
     category: 1
     place: Millbrook
     text: Millbrook recruits a town watch.
     affects: {fileID: 11400000, guid: e446b0765ca2bc04182feb297332617e, type: 2}
     strength: 0.6
     known: 1
-  - time: 27
-    category: 0
-    place: Stonewatch
-    text: Stonewatch Castle mans its walls.
-    affects: {fileID: 11400000, guid: 5dfe9b2bdcccc4a4aa5be328096a2f35, type: 2}
-    strength: 0.6
-    known: 0
-  - time: 44
+  - time: 0
     category: 1
-    place: Highfield
-    text: A royal hunt rides out from Highfield.
-    affects: {fileID: 11400000, guid: fed6eb1591a08494baa5f0623125db68, type: 2}
+    place: Harrowby
+    text: Bread riots break out in Harrowby.
+    affects: {fileID: 11400000, guid: e446b0765ca2bc04182feb297332617e, type: 2}
     strength: 0.5
-    known: 0
-  - time: 58
+    known: 1
+  - time: 0
+    category: 1
+    place: Kingsmere
+    text: The harvest is in at Kingsmere, and farmhands look for work.
+    affects: {fileID: 11400000, guid: e446b0765ca2bc04182feb297332617e, type: 2}
+    strength: -0.45
+    known: 1
+  - time: 0
+    category: 1
+    place: Saltmouth
+    text: Saltmouth's fishing fleet is laid up for the winter.
+    affects: {fileID: 11400000, guid: e446b0765ca2bc04182feb297332617e, type: 2}
+    strength: -0.4
+    known: 1
+  - time: 0
     category: 0
     place: Millbrook
     text: Mounted raiders sighted near Millbrook.
     affects: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
     strength: 0.6
     known: 1
+  - time: 0
+    category: 0
+    place: Highfield
+    text: Horse lords gather beyond Highfield.
+    affects: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
+    strength: 0.5
+    known: 1
+  - time: 0
+    category: 1
+    place: Kingsford
+    text: Kingsford's smiths finish a great order of pikes.
+    affects: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
+    strength: -0.45
+    known: 1
+  - time: 0
+    category: 1
+    place: Harrowby
+    text: The Harrowby garrison is paid off and sent home.
+    affects: {fileID: 11400000, guid: f4c9b41a42095c6489a9a6893ce3e964, type: 2}
+    strength: -0.4
+    known: 1
+  - time: 0
+    category: 0
+    place: Stonewatch
+    text: Stonewatch Castle mans its walls.
+    affects: {fileID: 11400000, guid: 5dfe9b2bdcccc4a4aa5be328096a2f35, type: 2}
+    strength: 0.6
+    known: 1
+  - time: 0
+    category: 0
+    place: Yewdale
+    text: Wolves prowl the woods around Yewdale.
+    affects: {fileID: 11400000, guid: 5dfe9b2bdcccc4a4aa5be328096a2f35, type: 2}
+    strength: 0.5
+    known: 1
+  - time: 0
+    category: 1
+    place: Yewdale
+    text: Yewdale's bowyers bring a cartload of bows to market.
+    affects: {fileID: 11400000, guid: 5dfe9b2bdcccc4a4aa5be328096a2f35, type: 2}
+    strength: -0.45
+    known: 1
+  - time: 0
+    category: 1
+    place: Reedmere
+    text: The Reedmere archery fair comes to an end.
+    affects: {fileID: 11400000, guid: 5dfe9b2bdcccc4a4aa5be328096a2f35, type: 2}
+    strength: -0.4
+    known: 1
+  - time: 0
+    category: 1
+    place: Highfield
+    text: A royal hunt rides out from Highfield.
+    affects: {fileID: 11400000, guid: fed6eb1591a08494baa5f0623125db68, type: 2}
+    strength: 0.5
+    known: 1
+  - time: 0
+    category: 0
+    place: Stonewatch
+    text: Enemy bowmen are seen on the hills by Stonewatch.
+    affects: {fileID: 11400000, guid: fed6eb1591a08494baa5f0623125db68, type: 2}
+    strength: 0.55
+    known: 1
+  - time: 0
+    category: 1
+    place: Kingsford
+    text: A horse fair opens in Kingsford.
+    affects: {fileID: 11400000, guid: fed6eb1591a08494baa5f0623125db68, type: 2}
+    strength: -0.45
+    known: 1
+  - time: 0
+    category: 1
+    place: Saltmouth
+    text: A ship of horses unloads at Saltmouth.
+    affects: {fileID: 11400000, guid: fed6eb1591a08494baa5f0623125db68, type: 2}
+    strength: -0.4
+    known: 1
+  eventsPerPhase: {x: 4, y: 6}
+  eventWindow: {x: 6, y: 66}
+  knownChance: 0.5
+  raidsPerPhase: {x: 1, y: 2}
+  raidWindow: {x: 10, y: 60}
+  raidOpenFor: 14
+  raidPlaces:
+  - Millbrook
+  - Harrowby
+  - Highfield
+  - Stonewatch
+  raidText: Bandits are raiding the farms near {0}.
+  banditTypes:
+  - {fileID: 11400000, guid: e446b0765ca2bc04182feb297332617e, type: 2}
+  banditWorth: {x: 60, y: 30}
+  raidPay: 1.2
   tipPrice: 20
   scoutPrice: 15
   winPay: 0.5
@@ -19754,6 +20016,7 @@ MonoBehaviour:
   focusClip: {fileID: 8300000, guid: 56fccd51d85d5e848b5f009c77b5a5bd, type: 3}
   noticeClip: {fileID: 8300000, guid: 797ed143a23597e4491b24592cf0df46, type: 3}
   invasionClip: {fileID: 8300000, guid: 91ec50bce27579641852557040a7b754, type: 3}
+  raidClip: {fileID: 0}
   battleClip: {fileID: 8300000, guid: 283e5f5149ef9204cbcaf129c5540cd8, type: 3}
 --- !u!82 &1909177708
 AudioSource:
@@ -21115,6 +21378,8 @@ MonoBehaviour:
   battleCamera: {fileID: 1645872198}
   sites:
   - {fileID: 467837721}
+  raidSites: {fileID: 420136575}
+  banditsHold: 0
   resultHold: 3
   ambienceInBattle: 0.15
   ambienceFade: 1.5
@@ -21136,6 +21401,7 @@ Transform:
   - {fileID: 1645872202}
   - {fileID: 301083245}
   - {fileID: 2136050007}
+  - {fileID: 420136575}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &2051825472
