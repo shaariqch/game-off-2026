@@ -79,6 +79,8 @@ public class TradeHud : MonoBehaviour
     int rowsForBattle = -1;
     readonly List<(MarketEvent marketEvent, VisualElement dot)> dots = new List<(MarketEvent, VisualElement)>();
     readonly List<Notice> shown = new List<Notice>();
+    // notices placed so far this frame at each place, so the next one there goes under them
+    readonly Dictionary<MapPlace, int> stacked = new Dictionary<MapPlace, int>();
     Key buyKey, sellKey;
     int builtForBattle = -1;
     bool built;
@@ -540,6 +542,7 @@ public class TradeHud : MonoBehaviour
         var panel = hud.panel;
         if (cam == null || panel == null)
             return;
+        stacked.Clear();
         for (int i = shown.Count - 1; i >= 0; i--)
         {
             var notice = shown[i];
@@ -576,8 +579,12 @@ public class TradeHud : MonoBehaviour
                 marker.style.marginRight = left ? 0 : 11;
                 marker.style.marginLeft = left ? 11 : 0;
                 float height = notice.root.resolvedStyle.height;
+                if (float.IsNaN(height)) height = 38f;
+                // several notices at one place stack downwards instead of covering each other
+                stacked.TryGetValue(notice.place, out int under);
+                stacked[notice.place] = under + 1;
                 notice.root.style.left = left ? point.x + 6f - (width + 23f) : point.x - 6f;
-                notice.root.style.top = point.y - (float.IsNaN(height) ? 19f : height * 0.5f);
+                notice.root.style.top = point.y - height * 0.5f + under * (height + 4f);
             }
             else
             {

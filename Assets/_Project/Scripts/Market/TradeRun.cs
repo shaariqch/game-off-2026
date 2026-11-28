@@ -165,6 +165,9 @@ public class TradeRun : MonoBehaviour
 
     [Header("Map")]
     [SerializeField] MapCamera mapCamera;
+    [Tooltip("Left and right arrows move focus to the map, where up and down scroll it. Off since the map view shows " +
+             "the whole kingdom at once (the user found scrolling tedious); the arrows then only work the list.")]
+    [SerializeField] bool mapScrolling;
 
     [Header("Sounds")]
     [Tooltip("The Shift keys' own sounds are on the HUD's TradeFeel players, with their feedback.")]
@@ -590,7 +593,9 @@ public class TradeRun : MonoBehaviour
 
     void ReadArrows(Keyboard keyboard)
     {
-        if (keyboard.leftArrowKey.wasPressedThisFrame && CurrentFocus != Focus.Map)
+        if (!mapScrolling)
+            CurrentFocus = Focus.Units;
+        else if (keyboard.leftArrowKey.wasPressedThisFrame && CurrentFocus != Focus.Map)
         {
             CurrentFocus = Focus.Map;
             Play(focusClip);
