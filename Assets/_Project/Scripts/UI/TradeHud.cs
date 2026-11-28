@@ -479,14 +479,6 @@ public class TradeHud : MonoBehaviour
                     row.held.EnableInClassList("unit-held--none", held == 0);
                     row.price.text = run.Market[i].Price.ToString();
                     trend = run.Market[i].Trend;
-                    // while a key is counting on this row, the price shows where the order will push it
-                    var order = run.Active;
-                    if (order != null && order.row == i && order.count > 0)
-                    {
-                        bool buying = order.side == TradeRun.Side.Buy;
-                        row.price.text = run.Market.PriceAfter(i, buying ? order.count : -order.count).ToString();
-                        trend = buying ? 1 : -1;
-                    }
                     break;
                 case TradeRun.RowKind.Tip:
                     row.held.text = "";
@@ -541,7 +533,11 @@ public class TradeHud : MonoBehaviour
         // tips, raids and scouting can only be bought
         bool noSelling = order.side == TradeRun.Side.Sell && idle && run.KindOf(run.Selected) != TradeRun.RowKind.Unit;
         key.root.EnableInClassList("key--closed", run.AtBattle || noSelling);
-        key.count.text = order.side == TradeRun.Side.Buy ? "+" + order.count : "−" + order.count;
+        // the count, and what it comes to: the price only moves once the trade goes through, so the climbing total
+        // is where a long hold shows it's getting dearer
+        string count = order.side == TradeRun.Side.Buy ? "+" + order.count : "−" + order.count;
+        int total = idle ? 0 : run.OrderTotal(order);
+        key.count.text = total > 0 ? count + " · " + total : count;
         key.arrow.MarkDirtyRepaint();
     }
 

@@ -251,6 +251,27 @@ public class TradeRun : MonoBehaviour
     public int ScoutPrice => IntelPrice(scoutPrice, scoutsBought);
     int IntelPrice(int first, int bought) => Mathf.RoundToInt(first * Mathf.Pow(intelPriceRise, bought));
 
+    /// <summary>What a pending order would cost (buying) or make (selling) if it went through now; 0 for raids.</summary>
+    public int OrderTotal(Order order)
+    {
+        if (order == null || order.count <= 0)
+            return 0;
+        switch (KindOf(order.row))
+        {
+            case RowKind.Unit:
+                return Market.Total(order.row, order.count, order.side == Side.Buy);
+            case RowKind.Tip:
+                int total = 0;
+                for (int i = 0; i < order.count; i++)
+                    total += IntelPrice(tipPrice, tipsBought + i);
+                return total;
+            case RowKind.Enemy:
+                return ScoutPrice;
+            default:
+                return 0;
+        }
+    }
+
     /// <summary>How many tips the cash buys now, each dearer than the last.</summary>
     int AffordableTips()
     {

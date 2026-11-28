@@ -207,6 +207,26 @@ public sealed class Market
         return (bought, spent);
     }
 
+    /// <summary>
+    /// What trading <paramref name="count"/> units would cost (buying) or make (selling) now, each at the price the
+    /// ones before it pushed it to, as <see cref="Buy"/> and <see cref="Sell"/> work it out. Changes nothing.
+    /// </summary>
+    public int Total(int index, int count, bool buying)
+    {
+        var listing = listings[index];
+        float factor = listing.factor;
+        int total = 0;
+        for (int i = 0; i < count; i++)
+        {
+            float push = Mathf.Clamp(factor + listing.eventPush, settings.factorRange.x, settings.factorRange.y);
+            total += i == 0 ? listing.Price : Mathf.Max(1, Mathf.RoundToInt(listing.type.cost * push));
+            factor = buying
+                ? Mathf.Min(factor + settings.buyImpact, settings.factorRange.y)
+                : Mathf.Max(factor - settings.sellImpact, settings.factorRange.x);
+        }
+        return total;
+    }
+
     /// <summary>Sells <paramref name="count"/> units one at a time, each at the price it has fallen to; returns the money made.</summary>
     public int Sell(int index, int count)
     {
