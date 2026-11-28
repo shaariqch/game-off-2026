@@ -18,8 +18,9 @@ public class MarketEvent
     public Category category = Category.Notice;
     [Tooltip("The place's name as it appears on a MapPlace in the scene.")]
     public string place;
-    [Tooltip("The sentence the player reads. It names a place and what is happening, never a unit type. Words " +
-             "between asterisks are the clue to which unit it moves, and show highlighted (*mans its walls*).")]
+    [Tooltip("The sentence the player reads: a place and what is happening there. Its notice also shows the unit it " +
+             "moves and which way (icon and arrow), so the sentence is flavour, not a riddle. Words between " +
+             "asterisks show highlighted in the event's colour (*mans its walls*).")]
     [TextArea] public string text;
     [Tooltip("The unit type whose price it moves.")]
     public UnitType affects;

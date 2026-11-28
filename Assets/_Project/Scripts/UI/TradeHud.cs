@@ -351,6 +351,19 @@ public class TradeHud : MonoBehaviour
             number.AddToClassList("serif");
             number.AddToClassList("notice-number");
             notice.panel.Add(number);
+            // what it does, plainly: the unit's list icon and which way its price goes (working it out from the
+            // sentence alone was unclear and, the user found, not fun)
+            if (marketEvent.affects != null)
+            {
+                var unit = new VisualElement();
+                unit.AddToClassList("icon");
+                unit.AddToClassList("notice-unit");
+                unit.style.backgroundImage = marketEvent.affects.icon;
+                notice.panel.Add(unit);
+                var trend = new HudShape(marketEvent.strength >= 0f ? HudShape.Kind.TriangleUp : HudShape.Kind.TriangleDown);
+                trend.AddToClassList("notice-trend");
+                notice.panel.Add(trend);
+            }
         }
         var text = new Label(Highlight(message, colour, placeName, placeColour));
         text.AddToClassList("notice-text");

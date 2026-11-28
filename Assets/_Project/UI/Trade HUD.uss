@@ -366,6 +366,19 @@
     margin-right: 8px;
 }
 
+/* the unit an event moves and which way, between the numeral and the sentence */
+.notice-unit {
+    width: 22px;
+    height: 22px;
+    margin-right: 2px;
+}
+
+.notice-trend {
+    width: 12px;
+    height: 12px;
+    margin-right: 10px;
+}
+
 .notice-text {
     font-size: 17px;
 }
