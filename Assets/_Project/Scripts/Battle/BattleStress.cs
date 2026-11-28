@@ -9,8 +9,8 @@ using UnityEngine;
 /// <summary>
 /// A performance check for army sizes, in development builds only: opened with <c>?stress</c> in a WebGL build's
 /// address (or launched with <c>-stress</c> on Windows), it stops the trading run, mutes the game and fights battles
-/// on the map's battlefield at each size in <see cref="sizes"/>: once with everything on, then with one cost off at a
-/// time (the figures' shadows, their skinning, the figures themselves). Each logs the frame rate at the height of the
+/// on the map's battlefield: at each of <see cref="skinnedSizes"/> with SkinnedMeshRenderers, then at each of
+/// <see cref="sizes"/> with figures skinned on the GPU from their bakes. Each logs the frame rate at the height of the
 /// battle and the view's own per-frame costs as "[Stress]" lines (the local test log on WebGL, Player.log on Windows).
 /// Both sides get the same mix of every unit type, and neither holds, so the lines meet quickly. It switches to the PC
 /// quality level where the platform has it (WebGL doesn't); <c>?stress&amp;q=0</c> keeps the default.
@@ -19,8 +19,10 @@ using UnityEngine;
 [NoAutoStaticsCleanup] // lifecycle-attr
 public class BattleStress : MonoBehaviour
 {
-    [Tooltip("Soldiers per side in each battle, in turn.")]
-    [SerializeField] int[] sizes = { 20, 40, 60 };
+    [Tooltip("Soldiers per side in each battle with baked figures, in turn.")]
+    [SerializeField] int[] sizes = { 20, 40, 60, 100, 150, 200 };
+    [Tooltip("Soldiers per side in each battle with skinned figures, which are slow past about 60.")]
+    [SerializeField] int[] skinnedSizes = { 20, 40, 60 };
     [Tooltip("Shares of each side by unit type name: militia, spearmen, archers, cavalry.")]
     [SerializeField] float[] mix = { 0.4f, 0.25f, 0.2f, 0.15f };
     [SerializeField] string[] typeNames = { "Militia", "Spearmen", "Archers", "Cavalry" };
@@ -87,72 +89,32 @@ public class BattleStress : MonoBehaviour
         yield return new WaitForSeconds(3f);
         yield return Measure("no battle", 0);
 
-        // A second run (stress2) showed the figures themselves are the cost: hiding them got every frame back, while
-        // damage numbers, particles, frozen animation and the battle's own code changed little. This one splits that
-        // between skinning (posing each mesh on the CPU) and drawing it (and its shadow).
-        var variants = new (string name, bool noShadows, bool fixedMeshes, bool hide)[]
-        {
-            ("everything", false, false, false),
-            ("figures cast no shadows", true, false, false),
-            ("fixed meshes (drawn the same, no skinning)", false, true, false),
-            ("fixed meshes, no shadows", true, true, false),
-            ("figures hidden", false, false, true),
-        };
-        var baked = new List<Mesh>();
-        foreach (int size in sizes)
-            foreach (var variant in variants)
+        // stress3 showed CPU skinning was most of the figures' cost; this compares skinned figures with figures
+        // skinned on the GPU from their bakes (BattleView.BakedFigures), at each size
+        bool wasBaked = view.BakedFigures;
+        foreach (bool baked in new[] { false, true })
+            foreach (int size in baked ? sizes : skinnedSizes)
             {
+                view.BakedFigures = baked;
                 var army = Army(types, size, out int figures, out int riders);
                 view.Begin(army, Army(types, size, out _, out _), false);
-                // a frame for the figures to take their first pose before any are baked
-                yield return null;
                 yield return null;
                 int skinned = 0, drawn = 0;
                 foreach (var root in view.StressFigureRoots())
                     foreach (var renderer in root.GetComponentsInChildren<Renderer>())
                     {
-                        if (variant.hide) { renderer.enabled = false; continue; }
-                        if (variant.fixedMeshes && renderer is SkinnedMeshRenderer skin && skin.enabled)
-                        {
-                            Fix(skin, variant.noShadows, baked);
-                            skinned++;
-                        }
-                        else if (renderer is SkinnedMeshRenderer) skinned++;
-                        if (variant.noShadows) renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        if (renderer is SkinnedMeshRenderer) skinned++;
                         drawn++;
                     }
                 yield return new WaitForSeconds(settle);
                 view.TakeTimings();
-                yield return Measure($"{size} a side, {variant.name}", figures * 2, riders * 2);
+                yield return Measure($"{size} a side, {(baked ? "baked" : "skinned")}", figures * 2, riders * 2);
                 Log($"  {skinned} skinned meshes, {drawn} renderers on figures | view: {view.TakeTimings()}");
                 view.Clear();
-                foreach (var mesh in baked) Destroy(mesh);
-                baked.Clear();
                 yield return new WaitForSeconds(2f);
             }
+        view.BakedFigures = wasBaked;
         Log("done");
-    }
-
-    /// <summary>
-    /// Swaps a skinned mesh for a plain copy of its current pose that follows the figure: the same mesh and materials
-    /// drawn the same way, without the CPU posing it every frame.
-    /// </summary>
-    static void Fix(SkinnedMeshRenderer skin, bool noShadows, List<Mesh> baked)
-    {
-        var mesh = new Mesh();
-        // baked with the renderer's own scale, then drawn at world scale 1 (the horse's bones are scaled 100)
-        skin.BakeMesh(mesh, true);
-        baked.Add(mesh);
-        var copy = new GameObject(skin.name + " (fixed)").transform;
-        copy.SetParent(skin.transform, false);
-        var scale = skin.transform.lossyScale;
-        copy.localScale = new Vector3(1f / Mathf.Max(1e-5f, scale.x), 1f / Mathf.Max(1e-5f, scale.y), 1f / Mathf.Max(1e-5f, scale.z));
-        copy.gameObject.AddComponent<MeshFilter>().sharedMesh = mesh;
-        var renderer = copy.gameObject.AddComponent<MeshRenderer>();
-        renderer.sharedMaterials = skin.sharedMaterials;
-        renderer.shadowCastingMode = noShadows ? UnityEngine.Rendering.ShadowCastingMode.Off : skin.shadowCastingMode;
-        renderer.receiveShadows = skin.receiveShadows;
-        skin.enabled = false;
     }
 
     List<ArmyEntry> Army(List<UnitType> types, int size, out int figures, out int riders)

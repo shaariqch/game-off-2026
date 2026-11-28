@@ -27,3 +27,4 @@ MonoBehaviour:
   chargeClip: {fileID: 7400000, guid: 85cc1e23436c24c4882712876a5f8334, type: 3}
   deathClip: {fileID: 7400006, guid: 85cc1e23436c24c4882712876a5f8334, type: 3}
   deadFace: eyes.dead
+  baked: {fileID: 11400000, guid: d5b31ed80f50d0a4c9790675baeee261, type: 2}

@@ -68,3 +68,4 @@ MonoBehaviour:
   - {fileID: 5957932628511814003, guid: b09be4f98e05fa7489d148a376fc0f1c, type: 3}
   - {fileID: 4303349539650078155, guid: bd386f443b5aff1478cfc4d9f157d560, type: 3}
   - {fileID: 3094330708855449807, guid: 7760eb562ddb5444b8d0e43f7c2192df, type: 3}
+  baked: {fileID: 11400000, guid: f9a47b1ca93036d49827833f5e937ca7, type: 2}

@@ -35,5 +35,8 @@ public class MountType : ScriptableObject
     [Tooltip("A blend shape on the mount's mesh set to full when it dies (the Quirky animals have eyes.dead). Optional.")]
     public string deadFace = "eyes.dead";
 
+    [Tooltip("The mount's animations baked for the GPU (Tools > Battle > Bake Figures), or none to skin it with a SkinnedMeshRenderer.")]
+    public BakedFigure baked;
+
     public bool Animated => idleClip != null;
 }

@@ -109,6 +109,9 @@ public class UnitType : ScriptableObject
     public AnimationClip[] knockbackClips = new AnimationClip[0];
     public AnimationClip[] deathClips = new AnimationClip[0];
 
+    [Tooltip("This type's animations baked for the GPU (Tools > Battle > Bake Figures). With it, battles skin the figure on the GPU; without it, with a SkinnedMeshRenderer.")]
+    public BakedFigure baked;
+
     public bool Animated => idleClip != null;
 
     public bool IsRanged => rangedDamage > 0f;

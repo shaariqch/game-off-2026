@@ -61,6 +61,8 @@ public class BattleView : MonoBehaviour
     [SerializeField] Material outfitSource;
     [SerializeField] Material outfitA;
     [SerializeField] Material outfitB;
+    [Tooltip("Skin figures on the GPU from their unit type's bake (Tools > Battle > Bake Figures), which costs the CPU almost nothing; off, or for a type with no bake, they use SkinnedMeshRenderers, which WebGL skins on the CPU every frame.")]
+    [SerializeField] bool bakedFigures = true;
     [Tooltip("Name of the bone a weapon is parented to.")]
     [SerializeField] string weaponBone = "Hand_R";
     [SerializeField] Vector3 weaponPosition;
@@ -188,7 +190,7 @@ public class BattleView : MonoBehaviour
         public Transform visual;
         public MMSpringScale spring;
         /// <summary>Plays the figure's clips, or null for a unit type without animation.</summary>
-        public FigureAnimation animation;
+        public IFigureAnimation animation;
         /// <summary>Smoothed ground speed, which picks idle, walk or run.</summary>
         public float speed;
         public bool placed;
@@ -200,10 +202,13 @@ public class BattleView : MonoBehaviour
         /// <summary>This rider's current charge has already been checked for a moment.</summary>
         public bool chargeSeen;
         /// <summary>A mounted figure: the mount's animation, the bone the rider sits on, and the rider's body.</summary>
-        public FigureAnimation mountAnimation;
+        public IFigureAnimation mountAnimation;
         public Transform seat;
         public Transform rider;
         public SkinnedMeshRenderer mountFace;
+        /// <summary>A baked mount's mesh, swapped for its dead-faced copy when it falls.</summary>
+        public MeshFilter bakedMount;
+        public Mesh bakedMountDead;
         /// <summary>The mount has fallen and the rider is on the ground beside it.</summary>
         public bool dismounted;
     }
@@ -230,6 +235,13 @@ public class BattleView : MonoBehaviour
 
     /// <summary>The battle being shown, or null before the first one.</summary>
     public BattleSim Sim => sim;
+
+    /// <summary>Whether battles started from now on skin their figures on the GPU (see the field's tooltip).</summary>
+    public bool BakedFigures
+    {
+        get => bakedFigures;
+        set => bakedFigures = value;
+    }
 
     // Switches for BattleStress, which turns costs off one at a time in test builds; never saved.
     [NonSerialized] public bool stressNoNumbers, stressNoEffects;
@@ -584,8 +596,20 @@ public class BattleView : MonoBehaviour
         var visual = new GameObject("Visual").transform;
         visual.SetParent(root, false);
         var figure = new Figure { root = root, visual = visual, yaw = Mathf.Atan2(unit.facing.x, unit.facing.y) * Mathf.Rad2Deg };
+        var outfit = unit.side == 0 ? outfitA : outfitB;
 
-        if (unit.type.visualPrefab != null)
+        var bakedBody = bakedFigures && unit.type.Animated ? unit.type.baked : null;
+        if (bakedBody != null && Usable(bakedBody, unit.type, Clips(unit.type)))
+        {
+            // skinned on the GPU: one mesh with the props merged in, and this figure's own copy of the material
+            var type = unit.type;
+            var body = BakedBody(bakedBody, outfit != null ? outfit : outfitSource, visual, type.visualScale, type.name);
+            figure.animation = new BakedFigureAnimation(bakedBody, body.material, type.idleClip, type.walkClip, type.runClip,
+                type.walkClipSpeed, type.runClipSpeed, Random.value, upperBodyMask != null);
+            if (type.mount != null && type.mount.prefab != null)
+                Mount(figure, type.mount, body.renderer.transform);
+        }
+        else if (unit.type.visualPrefab != null)
         {
             var body = Instantiate(unit.type.visualPrefab, visual);
             body.transform.localPosition = Vector3.zero;
@@ -616,8 +640,7 @@ public class BattleView : MonoBehaviour
                 Mount(figure, unit.type.mount, body.transform);
         }
 
-        // dressed in the side's colour
-        var outfit = unit.side == 0 ? outfitA : outfitB;
+        // dressed in the side's colour (a baked body already is)
         if (outfitSource != null && outfit != null)
             foreach (var renderer in visual.GetComponentsInChildren<Renderer>(true))
             {
@@ -641,6 +664,23 @@ public class BattleView : MonoBehaviour
     /// <summary>Puts a mount under the figure and the rider on its back.</summary>
     void Mount(Figure figure, MountType mount, Transform rider)
     {
+        if (bakedFigures && mount.Animated && mount.baked != null && Usable(mount.baked, mount, Clips(mount)))
+        {
+            // skinned on the GPU; the seat is an empty that follows the baked seat bone
+            var horse = BakedBody(mount.baked, mount.coat, figure.visual, mount.scale, mount.name);
+            figure.bakedMount = horse.filter;
+            figure.bakedMountDead = mount.baked.deadMesh;
+            var seat = new GameObject("Seat").transform;
+            seat.SetParent(horse.renderer.transform, false);
+            figure.seat = seat;
+            figure.rider = rider;
+            figure.mountAnimation = new BakedFigureAnimation(mount.baked, horse.material, mount.idleClip, mount.walkClip,
+                mount.runClip, mount.walkClipSpeed, mount.runClipSpeed, Random.value, false, seat);
+            if (figure.animation != null)
+                figure.animation.Mounted = true;
+            SeatRider(figure, mount);
+            return;
+        }
         var animal = Instantiate(mount.prefab, figure.visual);
         animal.transform.localPosition = Vector3.zero;
         animal.transform.localRotation = Quaternion.identity;
@@ -674,6 +714,103 @@ public class BattleView : MonoBehaviour
         if (figure.animation != null)
             figure.animation.Mounted = true;
         SeatRider(figure, mount);
+    }
+
+    /// <summary>
+    /// A body skinned on the GPU: the baked mesh on a plain MeshRenderer, with its own copy of the Baked Figure
+    /// material wearing the look's texture, colour and finish (a side's outfit, or a mount's coat).
+    /// </summary>
+    static (MeshFilter filter, MeshRenderer renderer, Material material) BakedBody(BakedFigure baked, Material look,
+        Transform parent, float scale, string label)
+    {
+        var body = new GameObject(label + " (baked)");
+        body.transform.SetParent(parent, false);
+        body.transform.localScale = Vector3.one * scale;
+        var filter = body.AddComponent<MeshFilter>();
+        filter.sharedMesh = baked.mesh;
+        var renderer = body.AddComponent<MeshRenderer>();
+        var material = new Material(baked.material) { name = baked.material.name + " (" + label + ")" };
+        Wear(look, material);
+        renderer.sharedMaterial = material;
+        return (filter, renderer, material);
+    }
+
+    /// <summary>Every clip a unit type's figure can be asked to play.</summary>
+    static IEnumerable<AnimationClip> Clips(UnitType type)
+    {
+        yield return type.idleClip;
+        yield return type.walkClip;
+        yield return type.runClip;
+        yield return type.shootClip;
+        foreach (var clip in type.attackClips) yield return clip;
+        foreach (var clip in type.hitClips) yield return clip;
+        foreach (var clip in type.knockbackClips) yield return clip;
+        foreach (var clip in type.deathClips) yield return clip;
+    }
+
+    static IEnumerable<AnimationClip> Clips(MountType mount)
+    {
+        yield return mount.idleClip;
+        yield return mount.walkClip;
+        yield return mount.runClip;
+        yield return mount.hitClip;
+        yield return mount.chargeClip;
+        yield return mount.deathClip;
+    }
+
+    readonly HashSet<UnityEngine.Object> staleBakes = new HashSet<UnityEngine.Object>();
+
+    /// <summary>Whether a bake has everything its owner plays; says so once per type when it doesn't (re-bake it).</summary>
+    bool Usable(BakedFigure baked, UnityEngine.Object owner, IEnumerable<AnimationClip> clips)
+    {
+        if (baked.Covers(clips))
+            return true;
+        if (staleBakes.Add(owner))
+            Debug.LogWarning($"{owner.name}'s bake is missing a clip or its texture, so its figures are skinned on the CPU: run Tools > Battle > Bake Figures.", owner);
+        return false;
+    }
+
+    static readonly string[] AlbedoNames ={ "_BaseMap", "_Albedo_Map", "_MainTex", "_BaseColorMap", "_Albedo" };
+    static readonly string[] TintNames = { "_BaseColor", "_Color" };
+
+    /// <summary>Copies a material's albedo texture, tint, smoothness, metallic and emission onto a Baked Figure material.</summary>
+    static void Wear(Material look, Material material)
+    {
+        if (look == null)
+            return;
+        Texture albedo = null;
+        foreach (var name in AlbedoNames)
+            if (look.HasTexture(name) && look.GetTexture(name) != null)
+            {
+                albedo = look.GetTexture(name);
+                break;
+            }
+        if (albedo == null)
+            foreach (var name in look.GetTexturePropertyNames())
+            {
+                var texture = look.GetTexture(name);
+                string lower = name.ToLowerInvariant();
+                if (texture != null && !lower.Contains("normal") && !lower.Contains("bump") && !lower.Contains("emission") && !lower.Contains("mask"))
+                {
+                    albedo = texture;
+                    break;
+                }
+            }
+        if (albedo != null)
+            material.SetTexture("_BaseMap", albedo);
+        foreach (var name in TintNames)
+            if (look.HasColor(name))
+            {
+                material.SetColor("_BaseColor", look.GetColor(name));
+                break;
+            }
+        if (look.HasFloat("_Smoothness"))
+            material.SetFloat("_Smoothness", look.GetFloat("_Smoothness"));
+        if (look.HasFloat("_Metallic"))
+            material.SetFloat("_Metallic", look.GetFloat("_Metallic"));
+        // the Quirky Series SoftSurface shader adds its colour (texture × tint) as emission at this strength
+        if (look.HasFloat("_Emission"))
+            material.SetFloat("_Emission", look.GetFloat("_Emission"));
     }
 
     /// <summary>Keeps the rider on the mount's back as the mount's stride lifts and drops it.</summary>
@@ -946,6 +1083,8 @@ public class BattleView : MonoBehaviour
             if (shape >= 0)
                 figure.mountFace.SetBlendShapeWeight(shape, 100f);
         }
+        if (figure.bakedMount != null && figure.bakedMountDead != null)
+            figure.bakedMount.sharedMesh = figure.bakedMountDead;
         if (figure.rider != null)
         {
             figure.rider.localPosition = new Vector3(mount.fallClear, 0f, 0f);

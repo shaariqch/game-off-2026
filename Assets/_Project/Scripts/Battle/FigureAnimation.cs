@@ -15,7 +15,7 @@ using UnityEngine.Playables;
 /// The graph runs in game time, so slow motion and freeze frames slow and stop it too. Call <see cref="Dispose"/>
 /// when the figure goes.
 /// </summary>
-public sealed class FigureAnimation
+public sealed class FigureAnimation : IFigureAnimation
 {
     const int Idle = 0, Walk = 1, Run = 2;
     const int LocomotionLayer = 0, WholeBodyLayer = 1, UpperBodyLayer = 2;
