@@ -231,6 +231,45 @@ public class BattleView : MonoBehaviour
     /// <summary>The battle being shown, or null before the first one.</summary>
     public BattleSim Sim => sim;
 
+    // Switches for BattleStress, which turns costs off one at a time in test builds; never saved.
+    [NonSerialized] public bool stressNoNumbers, stressNoEffects;
+    long simTime, eventTime, unitTime, otherTime;
+    int timedFrames, timedSteps;
+
+    /// <summary>
+    /// What this view's own work cost per frame since the last call, in ms: the battle's steps, turning their events
+    /// into effects, moving the figures, and the rest (arrows, moments). Starts counting again.
+    /// </summary>
+    public string TakeTimings()
+    {
+        double ms = 1000.0 / System.Diagnostics.Stopwatch.Frequency / Mathf.Max(1, timedFrames);
+        string text = $"steps {(float)timedSteps / Mathf.Max(1, timedFrames):0.0}/frame, sim {simTime * ms:0.0} ms, " +
+                      $"events {eventTime * ms:0.0}, figures {unitTime * ms:0.0}, other {otherTime * ms:0.0}";
+        simTime = eventTime = unitTime = otherTime = 0;
+        timedFrames = timedSteps = 0;
+        return text;
+    }
+
+    /// <summary>For BattleStress: stops every figure's animation (it holds its pose) or starts it again.</summary>
+    public void StressFreeze(bool freezeAnimation)
+    {
+        foreach (var figure in figures)
+        {
+            figure.animation?.SetPaused(freezeAnimation);
+            figure.mountAnimation?.SetPaused(freezeAnimation);
+        }
+    }
+
+    /// <summary>For BattleStress: every figure's root, the object its body, mount and props hang under.</summary>
+    public List<Transform> StressFigureRoots()
+    {
+        var roots = new List<Transform>();
+        foreach (var figure in figures)
+            if (figure.root != null)
+                roots.Add(figure.root);
+        return roots;
+    }
+
     /// <summary>The battle has ended: the winning side (0, 1) or <see cref="BattleSim.Draw"/>.</summary>
     public event Action<int> Finished;
 
@@ -331,7 +370,7 @@ public class BattleView : MonoBehaviour
     void ShowNumber(BattleSim.Unit unit, float damage, bool heavy)
     {
         var template = heavy ? heavyTemplate : hitTemplate;
-        if (template == null || unit == null || unit.id >= figures.Count)
+        if (template == null || unit == null || unit.id >= figures.Count || stressNoNumbers)
             return;
         var figure = figures[unit.id];
         if (figure.root == null)
@@ -359,16 +398,26 @@ public class BattleView : MonoBehaviour
         // cap the catch-up so one long frame can't freeze the game
         int steps = Mathf.Min(Mathf.FloorToInt(stepDebt / BattleSim.Step), 50);
         stepDebt = Mathf.Min(stepDebt - steps * BattleSim.Step, BattleSim.Step);
+        timedFrames++;
+        timedSteps += steps;
         for (int i = 0; i < steps; i++)
         {
+            long start = System.Diagnostics.Stopwatch.GetTimestamp();
             sim.Tick();
+            long ticked = System.Diagnostics.Stopwatch.GetTimestamp();
             ShowEvents();
+            simTime += ticked - start;
+            eventTime += System.Diagnostics.Stopwatch.GetTimestamp() - ticked;
         }
 
+        long shown = System.Diagnostics.Stopwatch.GetTimestamp();
         ShowUnits();
+        long unitsShown = System.Diagnostics.Stopwatch.GetTimestamp();
         ShowArrows();
         WatchForMoments();
         ShowMoment();
+        unitTime += unitsShown - shown;
+        otherTime += System.Diagnostics.Stopwatch.GetTimestamp() - unitsShown;
 
         if (sim.Winner != BattleSim.Running && !reported)
         {
@@ -1101,9 +1150,9 @@ public class BattleView : MonoBehaviour
         return system;
     }
 
-    static void Emit(ParticleSystem system, Vector3 position, Color colour, int count)
+    void Emit(ParticleSystem system, Vector3 position, Color colour, int count)
     {
-        if (system == null || count <= 0)
+        if (system == null || count <= 0 || stressNoEffects)
             return;
         var emit = new ParticleSystem.EmitParams { position = position, startColor = colour, applyShapeToPosition = true };
         system.Emit(emit, count);

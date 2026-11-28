@@ -100,6 +100,14 @@ public sealed class FigureAnimation
         graph.Play();
     }
 
+    /// <summary>Stops the graph (the figure holds its pose and costs no animation time) or starts it again.</summary>
+    public void SetPaused(bool paused)
+    {
+        if (!graph.IsValid()) return;
+        if (paused) graph.Stop();
+        else graph.Play();
+    }
+
     /// <summary>Blends the moving clips for this ground speed and advances the action fades.</summary>
     public void Update(float deltaTime, float speed)
     {

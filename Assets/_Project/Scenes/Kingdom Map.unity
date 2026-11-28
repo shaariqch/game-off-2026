@@ -8434,6 +8434,10 @@ PrefabInstance:
       propertyPath: m_Color.r
       value: 1.0724268
       objectReference: {fileID: 0}
+    - target: {fileID: 6948066750211098915, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 6948066750454693060, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_Name
       value: Cozy Weather Sphere
@@ -8784,7 +8788,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7481130337564779861, guid: dbf391fcd50a8b040bb6a47a1c8dc89b, type: 3}
       propertyPath: m_Shadows.m_Type
-      value: 2
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -19887,6 +19891,7 @@ MonoBehaviour:
   noticeColour: {r: 0.498, g: 0.769, b: 0.788, a: 1}
   invasionColour: {r: 0.878, g: 0.396, b: 0.31, a: 1}
   raidColour: {r: 0.89, g: 0.72, b: 0.4, a: 1}
+  noticeFade: {x: 0.5, y: 0.75}
   placeColour: {r: 0.79, g: 0.71, b: 0.95, a: 1}
   tradeHold: 0.9
 --- !u!114 &1909177706
